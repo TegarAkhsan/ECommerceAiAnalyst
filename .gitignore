@@ -1,0 +1,12 @@
+# Secrets — JANGAN commit API keys ke GitHub
+.streamlit/secrets.toml
+
+# Python cache
+__pycache__/
+*.pyc
+
+# User uploaded data
+user_data.csv
+
+# Scratch files
+scratch/
