@@ -1216,46 +1216,111 @@ Ini adalah perilaku normal **rolling forecast** berbasis lag features:
 **Gunakan prediksi ini sebagai:** estimasi baseline revenue, bukan prediksi hari per hari yang presisi.
         """)
 
-    # Plot 2 panel: historis dan prediksi terpisah agar lebih jelas
-    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(13, 7),
-                                    gridspec_kw={'height_ratios': [1.5, 1]})
-    fig.suptitle(f"Forecasting Revenue | Histori: {n_days_hist} hari → Prediksi: {horizon} hari",
-                 fontsize=12, fontweight='bold')
+    # ── Panel 1: Grafik Historis (Plotly interaktif) ─────────────
+    fig_hist = px.area(
+        daily_hist,
+        x='order_date',
+        y='total_revenue',
+        title=f'Data Historis Aktual ({n_days_hist} hari)',
+        labels={'order_date': 'Tanggal', 'total_revenue': 'Revenue (IDR)'},
+        color_discrete_sequence=['#00E5FF'],
+    )
+    fig_hist.update_traces(
+        line=dict(width=2, color='#00E5FF'),
+        fillcolor='rgba(0,229,255,0.12)',
+        hovertemplate='<b>%{x|%d %b %Y}</b><br>Revenue: Rp %{y:,.0f}<extra></extra>'
+    )
+    # Tambahkan garis rata-rata historis
+    fig_hist.add_hline(
+        y=avg_hist,
+        line_dash='dot', line_color='#FFD700', line_width=1.5,
+        annotation_text=f'Rata-rata: Rp {avg_hist/1e3:.0f}rb',
+        annotation_font_color='#FFD700',
+        annotation_position='top right'
+    )
+    fig_hist.update_layout(
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(255,255,255,0.04)',
+        font_color='#e2e8f0',
+        title_font_size=14,
+        margin=dict(l=10, r=10, t=45, b=10),
+        xaxis=dict(
+            gridcolor='rgba(255,255,255,0.06)',
+            tickformat='%d %b %Y',
+            title=None,
+        ),
+        yaxis=dict(
+            gridcolor='rgba(255,255,255,0.06)',
+            tickformat=',',
+            title='Revenue (IDR)',
+            tickprefix='Rp ',
+        ),
+        showlegend=False,
+        hovermode='x unified',
+    )
+    st.plotly_chart(fig_hist, use_container_width=True)
 
-    # Panel atas: historis lengkap
-    ax1.plot(daily_hist['order_date'], daily_hist['total_revenue'],
-             color='#378ADD', linewidth=0.9, label='Revenue aktual')
-    ax1.axhline(avg_hist, color='#378ADD', linestyle=':', linewidth=1,
-                alpha=0.6, label=f'Rata-rata historis: Rp {avg_hist/1e3:.0f}rb')
-    ax1.set_ylabel("Revenue (IDR)")
-    ax1.yaxis.set_major_formatter(plt.FuncFormatter(lambda x,_: f'Rp {x/1e6:.1f}jt'))
-    n_m = max(1,(daily_hist['order_date'].max()-daily_hist['order_date'].min()).days//30)
-    ax1.xaxis.set_major_formatter(mdates.DateFormatter('%d %b %Y'))
-    ax1.xaxis.set_major_locator(mdates.MonthLocator(interval=max(1, n_m//4)))
-    ax1.set_title("Data Historis (aktual)", fontsize=10)
-    ax1.legend(fontsize=9)
-    plt.setp(ax1.get_xticklabels(), rotation=20)
+    # ── Panel 2: Grafik Prediksi (Plotly interaktif) ──────────────
+    import plotly.graph_objects as go
+    fig_pred = go.Figure()
 
-    # Panel bawah: prediksi dengan interval
-    ax2.plot(df_forecast['order_date'], df_forecast['predicted_revenue'],
-             color='#E24B4A', linewidth=1.5, linestyle='--', label='Prediksi baseline')
-    ax2.fill_between(df_forecast['order_date'],
-                     df_forecast['predicted_revenue'] * 0.58,
-                     df_forecast['predicted_revenue'] * 1.42,
-                     alpha=0.18, color='#E24B4A', label='Rentang kemungkinan ±42% (MAPE historis)')
-    ax2.axhline(avg_hist, color='#378ADD', linestyle=':', linewidth=1,
-                alpha=0.6, label=f'Rata-rata historis: Rp {avg_hist/1e3:.0f}rb')
-    ax2.set_ylabel("Revenue (IDR)")
-    ax2.yaxis.set_major_formatter(plt.FuncFormatter(lambda x,_: f'Rp {x/1e6:.1f}jt'))
-    ax2.xaxis.set_major_formatter(mdates.DateFormatter('%d %b'))
-    ax2.xaxis.set_major_locator(mdates.WeekdayLocator(interval=2))
-    ax2.set_title(f"Prediksi {horizon} Hari ke Depan", fontsize=10)
-    ax2.legend(fontsize=9)
-    plt.setp(ax2.get_xticklabels(), rotation=20)
+    # Area rentang kemungkinan ±42%
+    fig_pred.add_trace(go.Scatter(
+        x=pd.concat([df_forecast['order_date'], df_forecast['order_date'][::-1]]),
+        y=pd.concat([df_forecast['predicted_revenue'] * 1.42,
+                     (df_forecast['predicted_revenue'] * 0.58)[::-1]]),
+        fill='toself',
+        fillcolor='rgba(255,215,0,0.12)',
+        line=dict(color='rgba(255,255,255,0)'),
+        name='Rentang ±42% (MAPE)',
+        hoverinfo='skip',
+    ))
 
-    plt.tight_layout()
-    st.pyplot(fig)
-    plt.close()
+    # Garis rata-rata historis sebagai referensi
+    fig_pred.add_hline(
+        y=avg_hist,
+        line_dash='dot', line_color='#00E5FF', line_width=1.2,
+        annotation_text=f'Rata-rata historis: Rp {avg_hist/1e3:.0f}rb',
+        annotation_font_color='#00E5FF',
+        annotation_position='top left'
+    )
+
+    # Garis prediksi utama
+    fig_pred.add_trace(go.Scatter(
+        x=df_forecast['order_date'],
+        y=df_forecast['predicted_revenue'],
+        mode='lines',
+        name='Prediksi baseline',
+        line=dict(color='#FFD700', width=2.5, dash='dash'),
+        hovertemplate='<b>%{x|%d %b %Y}</b><br>Prediksi: Rp %{y:,.0f}<extra></extra>',
+    ))
+
+    fig_pred.update_layout(
+        title=f'Prediksi {horizon} Hari ke Depan',
+        title_font_size=14,
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(255,255,255,0.04)',
+        font_color='#e2e8f0',
+        margin=dict(l=10, r=10, t=45, b=10),
+        xaxis=dict(
+            gridcolor='rgba(255,255,255,0.06)',
+            tickformat='%d %b',
+            title='Tanggal',
+        ),
+        yaxis=dict(
+            gridcolor='rgba(255,255,255,0.06)',
+            tickformat=',',
+            title='Revenue (IDR)',
+            tickprefix='Rp ',
+        ),
+        legend=dict(
+            orientation='h', yanchor='bottom', y=1.02,
+            xanchor='right', x=1,
+            bgcolor='rgba(0,0,0,0)',
+        ),
+        hovermode='x unified',
+    )
+    st.plotly_chart(fig_pred, use_container_width=True)
 
     # Ringkasan prediksi per minggu
     st.subheader("Ringkasan Prediksi per Minggu")
@@ -1334,7 +1399,7 @@ elif halaman == "Chatbot AI Agent":
 
     # ── Model selector (tampil hanya jika API key ada) ────────────
     GEMINI_MODELS = {
-        "gemini-3.1-flash"   : "Gemini 3.1 Flash Lite",
+        "gemini-3.1-flash-lite"   : "Gemini 3.1 Flash Lite",
         "gemini-2.5-flash"   : "Gemini 2.5 Flash",
         "gemini-1.5-flash"   : "Gemini 1.5 Flash",
         "gemini-1.5-flash-8b": "Gemini 1.5 Flash 8B",
