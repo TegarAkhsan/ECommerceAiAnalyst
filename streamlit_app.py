@@ -982,7 +982,7 @@ with st.sidebar:
 #  HALAMAN 1 : UPLOAD DATA
 # ════════════════════════════════════════════════════════════
 if halaman == "Upload Data":
-    st.title("📂 Upload Data Transaksi")
+    st.title("Upload Data Transaksi")
     st.info("Penjelasan Fitur: Di halaman ini Anda dapat mengunggah file laporan penjualan mentah (Excel/CSV) dari *Seller Centre* e-commerce Anda. Sistem kami akan secara cerdas membersihkan, memformat, dan menggabungkan data Anda sehingga siap untuk dianalisis oleh AI.", icon="💡")
 
     with st.expander("Format file yang diterima"):
@@ -1116,7 +1116,7 @@ menggabungkan dan mengurutkan otomatis.
 #  HALAMAN 2 : DASHBOARD FORECASTING
 # ════════════════════════════════════════════════════════════
 elif halaman == "Dashboard Forecasting":
-    st.title("📈 Dashboard Forecasting")
+    st.title("Dashboard Forecasting")
     st.info("**Penjelasan Fitur:**\nDi halaman ini Anda dapat melihat ringkasan performa penjualan Anda melalui grafik interaktif. Sistem juga menyajikan prediksi omzet (forecasting) untuk masa depan berdasarkan tren historis data penjualan Anda.", icon="💡")
 
     if 'daily_hist' not in st.session_state:
