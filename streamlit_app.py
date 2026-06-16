@@ -1069,7 +1069,7 @@ menggabungkan dan mengurutkan otomatis.
               f"{daily['order_date'].max().strftime('%d %b %Y')}")
 
     # Preview
-    st.subheader("Preview Data (setelah cleaning)")
+    st.subheader("Preview Data")
     cols_show = [c for c in ['order_id','product_category','Status Pesanan',
                               'Waktu Pesanan Dibuat','Total Pembayaran',
                               'Jumlah','Metode Pembayaran','Provinsi']
@@ -1182,7 +1182,7 @@ elif halaman == "Dashboard Forecasting":
     avg_hist   = daily_hist[daily_hist['total_revenue']>0]['total_revenue'].mean()
     delta_pct  = (avg_pred - avg_hist) / avg_hist * 100 if avg_hist > 0 else 0
 
-    c1, c2, c3, c4 = st.columns(4)
+    c1, c2, c3 = st.columns(3)
     c1.metric("Total Prediksi Revenue", f"Rp {total_pred:,.0f}",
               help=f"Akumulasi {horizon} hari ke depan")
     c2.metric("Rata-rata per Hari",
@@ -1191,8 +1191,6 @@ elif halaman == "Dashboard Forecasting":
     c3.metric("Puncak Prediksi",
               f"Rp {max_val:,.0f}",
               help=f"Tanggal: {max_dt.strftime('%d %b %Y')}")
-    c4.metric("Model",                  "XGBoost Tuned",
-              help="RMSE: ±Rp875rb | R²: 0.13 | MAPE: 58.92%")
 
     # Penjelasan sifat prediksi rolling forecast
     pred_std  = df_forecast['predicted_revenue'].std()
@@ -1216,95 +1214,76 @@ Ini adalah perilaku normal **rolling forecast** berbasis lag features:
 **Gunakan prediksi ini sebagai:** estimasi baseline revenue, bukan prediksi hari per hari yang presisi.
         """)
 
-    # ── Panel 1: Grafik Historis (Plotly interaktif) ─────────────
-    fig_hist = px.area(
-        daily_hist,
-        x='order_date',
-        y='total_revenue',
-        title=f'Data Historis Aktual ({n_days_hist} hari)',
-        labels={'order_date': 'Tanggal', 'total_revenue': 'Revenue (IDR)'},
-        color_discrete_sequence=['#00E5FF'],
-    )
-    fig_hist.update_traces(
-        line=dict(width=2, color='#00E5FF'),
+    # ── Grafik Gabungan Historis & Prediksi ──────────────
+    import plotly.graph_objects as go
+    fig_combined = go.Figure()
+
+    # Data Historis (Area Plot)
+    fig_combined.add_trace(go.Scatter(
+        x=daily_hist['order_date'],
+        y=daily_hist['total_revenue'],
+        mode='lines',
+        fill='tozeroy',
+        name='Historis Aktual',
+        line=dict(color='#00E5FF', width=2),
         fillcolor='rgba(0,229,255,0.12)',
         hovertemplate='<b>%{x|%d %b %Y}</b><br>Revenue: Rp %{y:,.0f}<extra></extra>'
-    )
-    # Tambahkan garis rata-rata historis
-    fig_hist.add_hline(
+    ))
+
+    # Menghubungkan titik akhir historis dengan titik awal prediksi
+    last_hist_date = daily_hist['order_date'].iloc[-1]
+    last_hist_rev = daily_hist['total_revenue'].iloc[-1]
+
+    range_dates = pd.concat([pd.Series([last_hist_date]), df_forecast['order_date']])
+    range_upper = pd.concat([pd.Series([last_hist_rev]), df_forecast['predicted_revenue'] * 1.42])
+    range_lower = pd.concat([pd.Series([last_hist_rev]), df_forecast['predicted_revenue'] * 0.58])
+
+    poly_x = pd.concat([range_dates, range_dates[::-1]])
+    poly_y = pd.concat([range_upper, range_lower[::-1]])
+
+    # Area rentang kemungkinan ±42% untuk prediksi
+    fig_combined.add_trace(go.Scatter(
+        x=poly_x,
+        y=poly_y,
+        fill='toself',
+        fillcolor='rgba(255,215,0,0.12)',
+        line=dict(color='rgba(255,255,255,0)'),
+        name='Rentang Prediksi ±42% (MAPE)',
+        hoverinfo='skip',
+    ))
+
+    # Prediksi Utama
+    pred_dates = pd.concat([pd.Series([last_hist_date]), df_forecast['order_date']])
+    pred_revs = pd.concat([pd.Series([last_hist_rev]), df_forecast['predicted_revenue']])
+
+    fig_combined.add_trace(go.Scatter(
+        x=pred_dates,
+        y=pred_revs,
+        mode='lines',
+        name='Prediksi Baseline',
+        line=dict(color='#FFD700', width=2.5, dash='dash'),
+        hovertemplate='<b>%{x|%d %b %Y}</b><br>Prediksi: Rp %{y:,.0f}<extra></extra>'
+    ))
+
+    # Garis rata-rata historis sebagai referensi
+    fig_combined.add_hline(
         y=avg_hist,
-        line_dash='dot', line_color='#FFD700', line_width=1.5,
-        annotation_text=f'Rata-rata: Rp {avg_hist/1e3:.0f}rb',
-        annotation_font_color='#FFD700',
-        annotation_position='top right'
+        line_dash='dot', line_color='rgba(255,255,255,0.4)', line_width=1.2,
+        annotation_text=f'Rata-rata historis: Rp {avg_hist/1e3:.0f}rb',
+        annotation_font_color='rgba(255,255,255,0.5)',
+        annotation_position='top left'
     )
-    fig_hist.update_layout(
+
+    fig_combined.update_layout(
+        title=f'Data Historis ({n_days_hist} hari) & Prediksi ({horizon} Hari ke Depan)',
+        title_font_size=16,
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(255,255,255,0.04)',
         font_color='#e2e8f0',
-        title_font_size=14,
         margin=dict(l=10, r=10, t=45, b=10),
         xaxis=dict(
             gridcolor='rgba(255,255,255,0.06)',
             tickformat='%d %b %Y',
-            title=None,
-        ),
-        yaxis=dict(
-            gridcolor='rgba(255,255,255,0.06)',
-            tickformat=',',
-            title='Revenue (IDR)',
-            tickprefix='Rp ',
-        ),
-        showlegend=False,
-        hovermode='x unified',
-    )
-    st.plotly_chart(fig_hist, use_container_width=True)
-
-    # ── Panel 2: Grafik Prediksi (Plotly interaktif) ──────────────
-    import plotly.graph_objects as go
-    fig_pred = go.Figure()
-
-    # Area rentang kemungkinan ±42%
-    fig_pred.add_trace(go.Scatter(
-        x=pd.concat([df_forecast['order_date'], df_forecast['order_date'][::-1]]),
-        y=pd.concat([df_forecast['predicted_revenue'] * 1.42,
-                     (df_forecast['predicted_revenue'] * 0.58)[::-1]]),
-        fill='toself',
-        fillcolor='rgba(255,215,0,0.12)',
-        line=dict(color='rgba(255,255,255,0)'),
-        name='Rentang ±42% (MAPE)',
-        hoverinfo='skip',
-    ))
-
-    # Garis rata-rata historis sebagai referensi
-    fig_pred.add_hline(
-        y=avg_hist,
-        line_dash='dot', line_color='#00E5FF', line_width=1.2,
-        annotation_text=f'Rata-rata historis: Rp {avg_hist/1e3:.0f}rb',
-        annotation_font_color='#00E5FF',
-        annotation_position='top left'
-    )
-
-    # Garis prediksi utama
-    fig_pred.add_trace(go.Scatter(
-        x=df_forecast['order_date'],
-        y=df_forecast['predicted_revenue'],
-        mode='lines',
-        name='Prediksi baseline',
-        line=dict(color='#FFD700', width=2.5, dash='dash'),
-        hovertemplate='<b>%{x|%d %b %Y}</b><br>Prediksi: Rp %{y:,.0f}<extra></extra>',
-    ))
-
-    fig_pred.update_layout(
-        title=f'Prediksi {horizon} Hari ke Depan',
-        title_font_size=14,
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(255,255,255,0.04)',
-        font_color='#e2e8f0',
-        margin=dict(l=10, r=10, t=45, b=10),
-        xaxis=dict(
-            gridcolor='rgba(255,255,255,0.06)',
-            tickformat='%d %b',
             title='Tanggal',
         ),
         yaxis=dict(
@@ -1320,7 +1299,8 @@ Ini adalah perilaku normal **rolling forecast** berbasis lag features:
         ),
         hovermode='x unified',
     )
-    st.plotly_chart(fig_pred, use_container_width=True)
+    
+    st.plotly_chart(fig_combined, use_container_width=True)
 
     # Ringkasan prediksi per minggu
     st.subheader("Ringkasan Prediksi per Minggu")
@@ -1342,7 +1322,6 @@ Ini adalah perilaku normal **rolling forecast** berbasis lag features:
         f"**Catatan penting:** Prediksi ini adalah estimasi baseline (rata-rata yang diharapkan). "
         f"Revenue aktual bisa 42–58% lebih tinggi atau lebih rendah karena faktor tak terduga "
         f"(event viral, promosi mendadak, harbolnas). "
-        f"Model XGBoost Tuned, RMSE ±Rp875rb/hari, R²=0.13."
     )
 
     # Tabel detail per hari
@@ -1355,23 +1334,6 @@ Ini adalah perilaku normal **rolling forecast** berbasis lag features:
         df_show['Batas Atas']      = (df_show['predicted_revenue']*1.42).apply(lambda x: f"Rp {x:,.0f}")
         st.dataframe(df_show[['Hari','Tanggal','Prediksi Revenue','Batas Bawah','Batas Atas']],
                      use_container_width=True, hide_index=True)
-
-    # Tabel performa model
-    st.subheader("Performa Model (evaluasi pada 30% test data)")
-    perf = {
-        'Model'     : ['XGBoost Tuned','RandomForest Default','RandomForest Tuned',
-                       'XGBoost Default','LinearReg Ridge','LinearReg Default'],
-        'RMSE (IDR)': ['875,804','890,311','894,852','977,411','1,516,198','1,662,944'],
-        'R²'        : ['0.1326','0.1036','0.0944','-0.0804','-1.5998','-2.1274'],
-        'MAE (IDR)' : ['629,015','632,631','639,573','777,577','1,333,407','1,479,758'],
-        'MAPE'      : ['58.92%','59.26%','59.17%','80.50%','144.31%','159.43%'],
-    }
-    st.dataframe(
-        pd.DataFrame(perf).style.apply(
-            lambda x: ['background-color:#E1F5EE' if i==0 else ''
-                       for i in range(len(x))], axis=0),
-        use_container_width=True, hide_index=True
-    )
 
 
 # ════════════════════════════════════════════════════════════
@@ -1386,11 +1348,26 @@ elif halaman == "Chatbot AI Agent":
     # ── Cek API Keys ──────────────────────────────────────────
     google_key = st.secrets.get("GOOGLE_API_KEY", "")
     tavily_key = st.secrets.get("TAVILY_API_KEY", "")
+
+    # Tambahan: Opsi user input API Key sendiri & Tutorial
+    user_google_key = st.sidebar.text_input("Google API Key (opsional)", type="password", help="Gunakan API Key Anda sendiri jika ada.")
+    if user_google_key:
+        google_key = user_google_key
+
+    with st.sidebar.expander("Tutorial Mendapatkan API Key"):
+        st.markdown('''
+        **Cara mendapatkan Google Gemini API Key (GRATIS):**
+        1. Buka [Google AI Studio](https://aistudio.google.com/app/apikey)
+        2. Login dengan akun Google Anda.
+        3. Klik tombol **"Create API key"**.
+        4. Salin kuncinya dan paste di kolom input **Google API Key** di atas.
+        ''')
+
     has_google = bool(google_key)
     has_tavily = bool(tavily_key)
 
     if not has_google:
-        st.warning("**GOOGLE_API_KEY belum diset.** Tambahkan di `.streamlit/secrets.toml`:")
+        st.warning("**GOOGLE_API_KEY belum diset.** Tambahkan di `.streamlit/secrets.toml` atau masukkan di sidebar:")
         st.code(
             'GOOGLE_API_KEY = "YOUR_GOOGLE_API_KEY"  # wajib — https://aistudio.google.com/app/apikey (GRATIS)\n'
             'TAVILY_API_KEY = "YOUR_TAVILY_API_KEY"  # opsional — https://tavily.com (GRATIS)',
