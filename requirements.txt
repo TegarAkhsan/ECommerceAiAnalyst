@@ -13,3 +13,5 @@ langchain-experimental>=0.0.60
 langchain-core>=0.2.0
 google-generativeai>=0.7.0
 tavily-python>=0.3.0
+plotly>=5.18.0
+langgraph>=0.0.30
