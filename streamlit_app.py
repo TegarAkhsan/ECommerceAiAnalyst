@@ -1,471 +1,609 @@
 # ============================================================
-# streamlit_app.py — AI Agent Analisis E-commerce v3
+# streamlit_app.py — AI Agent Analisis E-commerce (Gemini API & Clean UI)
 # ============================================================
-# Perubahan v3:
-#   1. Upload mendukung CSV dan XLSX (Excel) — langsung dari Shopee
-#   2. Bisa upload multi-file sekaligus (semua 24 Excel sekaligus)
-#   3. Model dan scaler diload dari file di folder project
-#      (model_xgb_tuned.pkl, scaler.pkl, feature_columns.json)
-#   4. Cleaning identik dengan 01_data_preparation.py
-#   5. Forecast lag dibangun dari histori aktual (fix Rp 27 bug)
-#   6. [FIX] Chatbot AI Agent: _init_agent() & _demo_response()
-#      diimplementasikan lengkap dengan LangChain ReAct architecture
+# 1. UI: Tema Putih & Biru Pastel (Minimalist & Profesional).
+# 2. AI Agent: Menggunakan Google Gemini API (Kecepatan & Akurasi Tinggi).
+# 3. Web Scraper: Mandiri tanpa Tavily API (Custom DuckDuckGo HTML).
+# 4. Forecasting: Agregasi Mingguan (Weekly).
 # ============================================================
 
 import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
 import plotly.express as px
-import joblib, json, os, io, warnings
+import joblib, json, os, warnings
 from datetime import timedelta
+import requests
+from bs4 import BeautifulSoup
+import urllib.parse
 
 warnings.filterwarnings('ignore')
 
+# ════════════════════════════════════════════════════════════
+#  BAGIAN 1: KONFIGURASI UTAMA & UI STYLING (PUTIH & BIRU PASTEL)
+# ════════════════════════════════════════════════════════════
+
 st.set_page_config(
-    page_title="AI Agent E-commerce Analitik",
-    page_icon="🤖", layout="wide",
+    page_title="E-commerce AI Analyst",
+    layout="wide",
     initial_sidebar_state="expanded"
+)
+
+# Pemulihan otomatis saat halaman keluar dari Back-Forward Cache (bfcache)
+import streamlit.components.v1 as components
+components.html(
+    """
+    <script>
+    window.addEventListener('pageshow', function(event) {
+        if (event.persisted) {
+            window.parent.location.reload();
+        }
+    });
+    </script>
+    """,
+    height=0,
+    width=0
 )
 
 st.markdown(
     """
     <style>
-    /* Modern typography and premium styling */
-    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200');
 
-    html, body, [class*="css"], .stMarkdown {
-        font-family: 'Outfit', sans-serif !important;
+    /* Global typography - do NOT override icon spans */
+    html, body, .stApp, .stMarkdown, p, label, input, textarea {
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+        color: #0f172a !important;
     }
 
-    /* Force Obsidian Theme on ALL Streamlit structural panels to override Light Theme splits */
-    .stApp, 
-    .main, 
-    .stMain,
-    section.main,
-    [data-testid="stAppViewContainer"], 
-    [data-testid="stMain"],
-    [data-testid="stMainBlockContainer"],
-    .block-container, 
-    [data-testid="stHeader"],
-    div[role="main"],
-    div[data-testid="stDataFrame"], 
-    div[data-testid="stTable"] {
-        background-color: #080a0f !important;
-        background-image: radial-gradient(circle at 85% 15%, rgba(0, 229, 255, 0.15) 0%, transparent 50%),
-                          radial-gradient(circle at 15% 85%, rgba(250, 204, 21, 0.12) 0%, transparent 50%) !important;
-        color: #f1f5f9 !important;
+    /* Preserve Material Symbols */
+    .material-symbols-rounded,
+    .material-icons,
+    [data-testid="stIconMaterial"] {
+        font-family: 'Material Symbols Rounded', 'Material Icons' !important;
+        font-feature-settings: 'liga' !important;
+        display: inline-block !important;
     }
 
-    /* Sidebar Panel Styling */
+    /* Overall Layout & Canvas */
+    .stApp, .main, [data-testid="stAppViewContainer"] {
+        background-color: #ffffff !important;
+    }
+
+    .block-container {
+        padding-top: 2rem !important;
+        padding-bottom: 3rem !important;
+        max-width: 980px !important;
+    }
+
+    header[data-testid="stHeader"] {
+        background-color: #ffffff !important;
+        border-bottom: 1px solid #f1f5f9 !important;
+    }
+
+    div[data-testid="stDecoration"] {
+        display: none !important;
+    }
+
+    /* Typography */
+    h1, h2, h3 {
+        color: #0f172a !important;
+        font-weight: 600 !important;
+        letter-spacing: -0.025em !important;
+    }
+    h1 {
+        font-size: 1.65rem !important;
+        margin-bottom: 0.35rem !important;
+    }
+    h2 {
+        font-size: 1.25rem !important;
+        margin-top: 1.25rem !important;
+        margin-bottom: 0.5rem !important;
+    }
+    h3 {
+        font-size: 1.05rem !important;
+    }
+
+    /* Header subtitle component */
+    .header-desc {
+        color: #64748b !important;
+        font-size: 0.92rem !important;
+        margin-bottom: 1.5rem !important;
+        line-height: 1.5 !important;
+    }
+
+    /* Minimalist GPT-style sidebar */
     section[data-testid="stSidebar"] {
-        background-color: #0c0f16 !important;
-        border-right: 1px solid rgba(255, 255, 255, 0.04) !important;
+        background-color: #f8fafc !important;
+        border-right: 1px solid #e2e8f0 !important;
     }
     section[data-testid="stSidebar"] hr {
-        border-color: rgba(255, 255, 255, 0.05) !important;
-    }
-    section[data-testid="stSidebar"] .stMarkdown p {
-        color: #94a3b8 !important;
+        border-color: #e2e8f0 !important;
+        margin: 1rem 0 !important;
     }
     
-    /* Premium Custom Sidebar Brand Logo */
-    .sidebar-logo {
+    .sidebar-brand {
         display: flex;
         align-items: center;
-        gap: 12px;
-        margin-bottom: 24px;
-        padding: 10px 4px;
+        gap: 10px;
+        padding: 4px 0 12px 0;
     }
-    .logo-icon {
-        width: 26px;
-        height: 26px;
-        background: radial-gradient(circle at 30% 30%, #00f0ff 0%, #facc15 65%, #000b33 100%);
-        border-radius: 50%;
-        box-shadow: 0 0 15px rgba(0, 229, 255, 0.4), 0 0 15px rgba(250, 204, 21, 0.2), inset -3px -3px 6px rgba(0,0,0,0.6);
-    }
-    .logo-text {
-        font-size: 1.3rem;
+    .brand-avatar {
+        width: 32px;
+        height: 32px;
+        background-color: #0f172a;
+        color: #ffffff !important;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
         font-weight: 700;
-        color: #ffffff;
-        letter-spacing: -0.5px;
-        background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
+        font-size: 0.92rem;
+    }
+    .brand-name {
+        font-size: 1rem;
+        font-weight: 600;
+        color: #0f172a !important;
+        line-height: 1.2;
+    }
+    .brand-role {
+        font-size: 0.72rem;
+        color: #64748b !important;
+        line-height: 1.2;
     }
 
-    /* Sidebar Radio Buttons -> Hide default circle bullets safely */
+    .sidebar-section-title {
+        font-size: 0.7rem !important;
+        font-weight: 600 !important;
+        color: #94a3b8 !important;
+        letter-spacing: 0.06em !important;
+        margin-top: 12px !important;
+        margin-bottom: 6px !important;
+        text-transform: uppercase !important;
+    }
+
+    /* Clean navigation menu (GPT list style) */
     div[data-testid="stRadio"] [role="radiogroup"] label > div:first-child {
         display: none !important;
     }
-    div[data-testid="stRadio"] [role="radiogroup"] label p {
-        color: #f1f5f9 !important;
-        font-weight: 500 !important;
-        margin: 0 !important;
-    }
-
-    /* Style stRadio label wrapper as a sleek button card */
     div[data-testid="stRadio"] [role="radiogroup"] label {
-        background-color: rgba(255, 255, 255, 0.02) !important;
-        border: 1px solid rgba(255, 255, 255, 0.05) !important;
+        background-color: transparent !important;
+        border: 1px solid transparent !important;
         border-radius: 8px !important;
-        padding: 12px 16px !important;
-        margin-bottom: 8px !important;
-        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
-        color: #94a3b8 !important;
+        padding: 9px 12px !important;
+        margin-bottom: 4px !important;
+        color: #475569 !important;
         cursor: pointer !important;
-        display: flex !important;
-        align-items: center !important;
         width: 100% !important;
-        box-sizing: border-box !important;
+        font-size: 0.88rem !important;
+        font-weight: 500 !important;
+        box-shadow: none !important;
+        transition: all 0.15s ease !important;
     }
     div[data-testid="stRadio"] [role="radiogroup"] label:hover {
-        background-color: rgba(255, 255, 255, 0.06) !important;
-        border-color: rgba(0, 229, 255, 0.3) !important;
-        color: #ffffff !important;
-        padding-left: 20px !important;
+        background-color: #edf2f7 !important;
+        color: #0f172a !important;
     }
     div[data-testid="stRadio"] [role="radiogroup"] label[data-checked="true"] {
-        background: linear-gradient(135deg, rgba(0, 229, 255, 0.16) 0%, rgba(250, 204, 21, 0.04) 100%) !important;
-        border-color: #00e5ff !important;
-        color: #00e5ff !important;
+        background-color: #e2e8f0 !important;
+        color: #0f172a !important;
         font-weight: 600 !important;
-        border-left: 4px solid #00e5ff !important;
-        border-right: 4px solid #facc15 !important;
-        border-radius: 8px !important;
-        padding-left: 20px !important;
-        box-shadow: 0 4px 15px rgba(0, 229, 255, 0.1), 0 0 10px rgba(250, 204, 21, 0.1) !important;
     }
 
-    /* Premium Status Cards & Streamlit Metric Containers styling */
-    .status-card, 
-    div[data-testid="metric-container"],
-    div[data-testid="stMetric"],
-    .stMetric {
-        background: rgba(20, 25, 40, 0.4) !important;
-        border: 1px solid rgba(255, 255, 255, 0.08) !important;
-        border-radius: 16px !important;
-        padding: 20px 24px !important;
-        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3), inset 0 0 0 1px rgba(0, 229, 255, 0.05), inset 0 0 20px rgba(250, 204, 21, 0.02) !important;
-        backdrop-filter: blur(16px) !important;
-        -webkit-backdrop-filter: blur(16px) !important;
-        display: flex;
-        flex-direction: column;
-        margin-bottom: 12px;
-        transition: all 0.3s ease !important;
+    /* File Uploader Clean Light Styling (Fix black dropzone) */
+    [data-testid="stFileUploader"],
+    [data-testid="stFileUploader"] section,
+    [data-testid="stFileUploadDropzone"],
+    div[data-testid="stFileUploaderDropzone"] {
+        background-color: #f8fafc !important;
+        border: 1.5px dashed #cbd5e1 !important;
+        border-radius: 12px !important;
+        color: #334155 !important;
+        padding: 24px 16px !important;
+        text-align: center !important;
     }
-    .status-card:hover, 
-    div[data-testid="metric-container"]:hover,
-    div[data-testid="stMetric"]:hover {
-        transform: translateY(-4px);
-        border-color: rgba(0, 229, 255, 0.4) !important;
-        box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.4), 0 0 20px rgba(0, 229, 255, 0.2), 0 0 20px rgba(250, 204, 21, 0.1) !important;
+    [data-testid="stFileUploader"]:hover,
+    div[data-testid="stFileUploaderDropzone"]:hover {
+        background-color: #f1f5f9 !important;
+        border-color: #94a3b8 !important;
     }
-    
-    /* Label styling */
-    .status-label, 
-    div[data-testid="metric-container"] label,
-    div[data-testid="stMetric"] label {
+    [data-testid="stFileUploader"] small,
+    [data-testid="stFileUploader"] span,
+    [data-testid="stFileUploader"] p,
+    div[data-testid="stFileUploaderDropzone"] small {
+        color: #64748b !important;
+    }
+    [data-testid="stFileUploader"] button {
+        background-color: #ffffff !important;
+        border: 1px solid #cbd5e1 !important;
+        color: #0f172a !important;
+        font-weight: 500 !important;
+        border-radius: 8px !important;
+        padding: 6px 14px !important;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.04) !important;
+    }
+    [data-testid="stFileUploader"] button:hover {
+        background-color: #f8fafc !important;
+        border-color: #94a3b8 !important;
+    }
+
+    /* Info card guide */
+    .guide-card {
+        background-color: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 16px 20px;
+    }
+    .guide-title {
+        font-weight: 600;
+        font-size: 0.82rem;
+        color: #0f172a;
+        margin-bottom: 8px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+    .guide-list {
+        margin: 0;
+        padding-left: 16px;
+        font-size: 0.84rem;
+        color: #475569;
+        line-height: 1.65;
+    }
+
+    /* Minimalist metric cards */
+    div[data-testid="metric-container"] {
+        background: #ffffff !important;
+        border: 1px solid #e2e8f0 !important;
+        border-radius: 10px !important;
+        padding: 14px 18px !important;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02) !important;
+    }
+    div[data-testid="metric-container"] label {
+        color: #64748b !important;
         font-size: 0.75rem !important;
-        color: #94a3b8 !important;
-        font-weight: 600 !important;
+        font-weight: 500 !important;
         text-transform: uppercase !important;
-        letter-spacing: 1px !important;
-        margin-bottom: 6px !important;
+        letter-spacing: 0.04em !important;
     }
-    
-    /* Value styling */
-    .status-val, 
-    div[data-testid="metric-container"] div[data-testid="stMetricValue"],
-    div[data-testid="stMetric"] div[data-testid="stMetricValue"] {
-        font-size: 1.4rem !important;
-        color: #ffffff !important;
-        font-weight: 700 !important;
-    }
-    
-    /* Clean up default Streamlit metric margin */
-    div[data-testid="metric-container"] > div,
-    div[data-testid="stMetric"] > div {
-        margin: 0 !important;
-        padding: 0 !important;
-    }
-
-    /* Premium File Uploader Dropzone Override */
-    [data-testid="stFileUploadDropzone"] {
-        background-color: rgba(18, 24, 38, 0.5) !important;
-        border: 1px dashed rgba(6, 182, 212, 0.3) !important;
-        border-radius: 12px !important;
-        padding: 30px !important;
-        color: #e2e8f0 !important;
-        transition: all 0.3s ease !important;
-    }
-    [data-testid="stFileUploadDropzone"]:hover {
-        border-color: #00e5ff !important;
-        background-color: rgba(6, 182, 212, 0.05) !important;
-        box-shadow: 0 0 15px rgba(6, 182, 212, 0.1) !important;
-    }
-    [data-testid="stFileUploadDropzone"] button {
-        background: rgba(6, 182, 212, 0.1) !important;
-        border: 1px solid rgba(6, 182, 212, 0.3) !important;
-        color: #00e5ff !important;
-        border-radius: 8px !important;
+    div[data-testid="metric-container"] div[data-testid="stMetricValue"] {
+        color: #0f172a !important;
+        font-size: 1.45rem !important;
         font-weight: 600 !important;
     }
-    [data-testid="stFileUploadDropzone"] button:hover {
-        background: rgba(6, 182, 212, 0.25) !important;
-        border-color: #00e5ff !important;
-    }
-    [data-testid="stFileUploadDropzone"] div {
-        color: #94a3b8 !important;
-    }
 
-    /* HTML Tables and DataFrame styling */
-    div[data-testid="stDataFrame"], 
-    div[data-testid="stTable"], 
-    .stTable,
-    div[data-testid="stDataFrame"] iframe {
-        background-color: rgba(18, 24, 38, 0.5) !important;
-        border: 1px solid rgba(255, 255, 255, 0.06) !important;
-        border-radius: 12px !important;
-        overflow: hidden !important;
-    }
-    table {
-        background-color: rgba(18, 24, 38, 0.5) !important;
-        color: #f1f5f9 !important;
-        border-collapse: collapse !important;
-        width: 100% !important;
-        border: none !important;
-    }
-    thead tr {
-        background-color: rgba(6, 182, 212, 0.1) !important;
+    /* Clean tables */
+    div[data-testid="stDataFrame"] {
+        border: 1px solid #e2e8f0 !important;
+        border-radius: 10px !important;
     }
     th {
-        background-color: transparent !important;
-        color: #00e5ff !important;
+        background-color: #f8fafc !important;
+        color: #334155 !important;
+        border-bottom: 1px solid #e2e8f0 !important;
         font-weight: 600 !important;
-        border-bottom: 1px solid rgba(6, 182, 212, 0.2) !important;
-        padding: 12px 16px !important;
-        text-align: left !important;
-        font-size: 0.85rem !important;
-        text-transform: uppercase !important;
-        letter-spacing: 0.5px !important;
+        font-size: 0.82rem !important;
     }
     td {
-        border-bottom: 1px solid rgba(255, 255, 255, 0.04) !important;
-        padding: 12px 16px !important;
-        color: #e2e8f0 !important;
-        font-size: 0.9rem !important;
-    }
-    tr:hover {
-        background-color: rgba(255, 255, 255, 0.02) !important;
+        background-color: #ffffff !important;
+        color: #475569 !important;
+        border-bottom: 1px solid #f1f5f9 !important;
+        font-size: 0.85rem !important;
     }
 
-    /* Glassmorphic Chat Messages overrides */
+    /* Conversational chat styling */
     div[data-testid="stChatMessage"] {
-        background-color: rgba(22, 28, 38, 0.4) !important;
-        border: 1px solid rgba(255, 255, 255, 0.05) !important;
-        border-radius: 12px !important;
-        padding: 16px 20px !important;
-        margin-bottom: 12px !important;
-        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2) !important;
-    }
-    div[data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] p {
-        color: #e2e8f0 !important;
-        font-size: 0.95rem !important;
-    }
-
-    /* Expanders styling */
-    div[data-testid="stExpander"] {
-        background: rgba(22, 28, 38, 0.4) !important;
-        border: 1px solid rgba(255, 255, 255, 0.06) !important;
-        border-radius: 12px !important;
-    }
-    div[data-testid="stExpander"]:hover {
-        border-color: rgba(6, 182, 212, 0.3) !important;
-    }
-    div[data-testid="stExpander"] summary {
-        font-weight: 600 !important;
-        color: #e2e8f0 !important;
-    }
-
-    /* Inputs, Selectboxes, Chat Inputs */
-    div[data-testid="stSelectbox"] > div, div[data-testid="stTextInput"] > div {
-        background-color: rgba(18, 24, 38, 0.6) !important;
-        border: 1px solid rgba(255, 255, 255, 0.08) !important;
-        border-radius: 10px !important;
-        color: #ffffff !important;
-    }
-    div[data-testid="stChatInput"] {
-        background-color: #121620 !important;
-        border: 1px solid rgba(255, 255, 255, 0.08) !important;
-        border-radius: 16px !important;
-        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4) !important;
-    }
-    div[data-testid="stChatInput"] textarea {
         background-color: transparent !important;
-        color: #ffffff !important;
+        border: none !important;
+        border-bottom: 1px solid #f1f5f9 !important;
+        border-radius: 0 !important;
+        padding: 16px 0 !important;
+        align-items: flex-start !important;
+        gap: 12px !important;
     }
-
-    /* Action Buttons */
-    button[kind="secondaryFormSubmit"], button[kind="primary"], button[kind="secondary"] {
-        background: rgba(6, 182, 212, 0.1) !important;
-        border: 1px solid rgba(6, 182, 212, 0.3) !important;
+    div[data-testid="stChatMessage"]:nth-child(even) {
+        background-color: #fafbfc !important;
         border-radius: 10px !important;
-        color: #00e5ff !important;
-        font-weight: 600 !important;
-        padding: 10px 20px !important;
-        transition: all 0.3s ease !important;
-    }
-    button[kind="secondaryFormSubmit"]:hover, button[kind="primary"]:hover, button[kind="secondary"]:hover {
-        background: rgba(6, 182, 212, 0.25) !important;
-        border-color: #00e5ff !important;
-        box-shadow: 0 0 15px rgba(6, 182, 212, 0.2) !important;
-        transform: translateY(-1px) !important;
-    }
-    
-    /* Sleek scrollbar */
-    ::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-    }
-    ::-webkit-scrollbar-track {
-        background: #080a0f;
-    }
-    ::-webkit-scrollbar-thumb {
-        background: rgba(6, 182, 212, 0.2);
-        border-radius: 4px;
-    }
-    ::-webkit-scrollbar-thumb:hover {
-        background: rgba(6, 182, 212, 0.4);
+        padding: 16px 18px !important;
     }
 
-    /* Dashboard Mockup - Layout, floating orb, option cards */
-    .welcome-card-grid {
-        display: grid;
-        grid-template-columns: 1fr 1fr 1fr;
-        gap: 16px;
-        margin-top: 30px;
+    /* Bulletproof GPT avatar badges (no raw ligature text leaks like 'smart_toy') */
+    div[data-testid="stChatMessageAvatar"] {
+        width: 32px !important;
+        height: 32px !important;
+        min-width: 32px !important;
+        border-radius: 8px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        overflow: hidden !important;
     }
-    .welcome-option-card {
-        background: rgba(22, 28, 38, 0.5);
-        border: 1px solid rgba(255, 255, 255, 0.05);
-        border-radius: 14px;
+    div[data-testid="stChatMessageAvatarAssistant"] {
+        background-color: #0f172a !important;
+    }
+    div[data-testid="stChatMessageAvatarAssistant"] span {
+        font-size: 0 !important;
+        display: none !important;
+    }
+    div[data-testid="stChatMessageAvatarAssistant"]::after {
+        content: "AI";
+        font-family: 'Inter', sans-serif !important;
+        font-size: 0.76rem !important;
+        font-weight: 700 !important;
+        color: #ffffff !important;
+        line-height: 1 !important;
+    }
+
+    div[data-testid="stChatMessageAvatarUser"] {
+        background-color: #f1f5f9 !important;
+        border: 1px solid #e2e8f0 !important;
+    }
+    div[data-testid="stChatMessageAvatarUser"] span {
+        font-size: 0 !important;
+        display: none !important;
+    }
+    div[data-testid="stChatMessageAvatarUser"]::after {
+        content: "U";
+        font-family: 'Inter', sans-serif !important;
+        font-size: 0.76rem !important;
+        font-weight: 700 !important;
+        color: #334155 !important;
+        line-height: 1 !important;
+    }
+
+    /* Always-visible Sidebar Toggle Buttons (Collapse & Expand) */
+    div[data-testid="stSidebarHeader"],
+    div[data-testid="stSidebarCollapseButton"],
+    button[data-testid="stSidebarCollapseButton"],
+    div[data-testid="stSidebarExpandButton"],
+    button[data-testid="stSidebarExpandButton"] {
+        opacity: 1 !important;
+        visibility: visible !important;
+    }
+
+    button[data-testid="stSidebarCollapseButton"],
+    button[data-testid="stSidebarExpandButton"] {
+        opacity: 1 !important;
+        visibility: visible !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        width: 32px !important;
+        height: 32px !important;
+        background-color: #ffffff !important;
+        border: 1px solid #e2e8f0 !important;
+        border-radius: 8px !important;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04) !important;
+        cursor: pointer !important;
+        transition: all 0.15s ease !important;
+    }
+
+    button[data-testid="stSidebarCollapseButton"]:hover,
+    button[data-testid="stSidebarExpandButton"]:hover {
+        background-color: #f1f5f9 !important;
+        border-color: #cbd5e1 !important;
+    }
+
+    button[data-testid="stSidebarCollapseButton"] span,
+    button[data-testid="stSidebarExpandButton"] span {
+        font-size: 0 !important;
+        display: none !important;
+    }
+
+    button[data-testid="stSidebarCollapseButton"]::after {
+        content: "«";
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+        font-size: 1.15rem !important;
+        font-weight: 700 !important;
+        line-height: 1 !important;
+        color: #334155 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+
+    button[data-testid="stSidebarExpandButton"]::after {
+        content: "»";
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
+        font-size: 1.15rem !important;
+        font-weight: 700 !important;
+        line-height: 1 !important;
+        color: #334155 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+
+    div[data-testid="stChatInput"] {
+        background-color: #ffffff !important;
+        border: 1px solid #cbd5e1 !important;
+        border-radius: 16px !important;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.04) !important;
+    }
+    div[data-testid="stChatInput"]:focus-within {
+        border-color: #94a3b8 !important;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.06) !important;
+    }
+
+    /* Neutral buttons */
+    button[kind="secondary"], button[kind="primary"] {
+        border-radius: 8px !important;
+        font-weight: 500 !important;
+        font-size: 0.85rem !important;
+        border: 1px solid #cbd5e1 !important;
+        background-color: #ffffff !important;
+        color: #334155 !important;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.02) !important;
+        transition: all 0.15s ease !important;
+    }
+    button[kind="secondary"]:hover, button[kind="primary"]:hover {
+        background-color: #f8fafc !important;
+        border-color: #94a3b8 !important;
+        color: #0f172a !important;
+    }
+
+    /* Clean alerts */
+    div[data-testid="stAlert"] {
+        border-radius: 8px !important;
+        border: 1px solid #e2e8f0 !important;
+        background-color: #f8fafc !important;
+        color: #334155 !important;
+    }
+
+    /* Sidebar footer */
+    .sidebar-footer {
+        padding-top: 14px;
+        border-top: 1px solid #e2e8f0;
+        margin-top: 24px;
+    }
+    .status-badge {
+        font-size: 0.74rem;
+        color: #059669;
+        font-weight: 500;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-bottom: 4px;
+    }
+    .status-dot {
+        width: 6px;
+        height: 6px;
+        background-color: #10b981;
+        border-radius: 50%;
+        display: inline-block;
+    }
+    .version-text {
+        font-size: 0.7rem;
+        color: #94a3b8;
+    }
+
+    /* Data Analyst Insight Container & Cards */
+    .analyst-box {
+        background-color: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
         padding: 24px;
-        text-align: left;
-        transition: all 0.3s ease;
-        cursor: pointer;
-        position: relative;
+        margin-top: 24px;
+        margin-bottom: 24px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
     }
-    .welcome-option-card:hover {
-        transform: translateY(-4px);
-        border-color: rgba(6, 182, 212, 0.4);
-        box-shadow: 0 10px 30px rgba(6, 182, 212, 0.08);
-    }
-    .welcome-card-icon {
-        font-size: 1.5rem;
-        color: #00e5ff;
-        margin-bottom: 12px;
-    }
-    .welcome-card-title {
-        font-size: 0.95rem;
+    .analyst-badge {
+        display: inline-block;
+        font-size: 0.68rem;
         font-weight: 700;
-        color: #ffffff;
-        margin-bottom: 6px;
-    }
-    .welcome-card-desc {
-        font-size: 0.8rem;
-        color: #94a3b8;
-        line-height: 1.4;
-    }
-    .welcome-card-arrow {
-        position: absolute;
-        top: 20px;
-        right: 20px;
-        color: rgba(255, 255, 255, 0.3);
-        font-size: 1rem;
-    }
-    
-    .welcome-header {
-        text-align: center;
-        margin: 40px 0 20px 0;
-    }
-    .welcome-sphere-container {
-        position: relative;
-        width: 120px;
-        height: 120px;
-        margin: 0 auto 24px auto;
-    }
-    .welcome-sphere {
-        width: 100%;
-        height: 100%;
-        background: radial-gradient(circle at 30% 30%, #00f0ff 0%, #007bff 40%, #000c3b 90%);
-        border-radius: 50%;
-        box-shadow: 0 0 50px rgba(0, 229, 255, 0.4), inset -12px -12px 25px rgba(0, 0, 0, 0.8);
-        animation: sphereFloat 4s ease-in-out infinite;
-    }
-    .welcome-sphere-glow {
-        position: absolute;
-        top: -10px;
-        left: -10px;
-        right: -10px;
-        bottom: -10px;
-        background: radial-gradient(circle, rgba(0, 229, 255, 0.15) 0%, transparent 70%);
-        border-radius: 50%;
-        animation: pulseGlow 4s ease-in-out infinite;
-    }
-    @keyframes sphereFloat {
-        0% { transform: translateY(0px); }
-        50% { transform: translateY(-12px); }
-        100% { transform: translateY(0px); }
-    }
-    @keyframes pulseGlow {
-        0% { transform: scale(1); opacity: 0.8; }
-        50% { transform: scale(1.1); opacity: 1; }
-        100% { transform: scale(1); opacity: 0.8; }
-    }
-    .welcome-title-small {
-        font-size: 0.8rem;
-        color: #94a3b8;
-        font-weight: 700;
-        letter-spacing: 3px;
+        letter-spacing: 0.08em;
         text-transform: uppercase;
+        color: #0369a1;
+        background-color: #f0f9ff;
+        border: 1px solid #bae6fd;
+        border-radius: 6px;
+        padding: 4px 10px;
         margin-bottom: 8px;
     }
-    .welcome-title-main {
-        font-size: 2.2rem;
+    .analyst-heading {
+        font-size: 1.15rem;
         font-weight: 700;
-        color: #ffffff;
-        letter-spacing: -0.5px;
-        background: linear-gradient(135deg, #ffffff 0%, #cbd5e1 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
+        color: #0f172a;
+        margin-bottom: 4px;
+        letter-spacing: -0.01em;
+    }
+    .analyst-subheading {
+        font-size: 0.85rem;
+        color: #64748b;
         margin-bottom: 20px;
+        line-height: 1.5;
+    }
+    .analyst-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 14px;
+        margin-bottom: 20px;
+    }
+    .analyst-card {
+        background-color: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 16px 18px;
+    }
+    .analyst-card-title {
+        font-size: 0.74rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #475569;
+        margin-bottom: 6px;
+    }
+    .analyst-card-value {
+        font-size: 1.05rem;
+        font-weight: 700;
+        color: #0f172a;
+        margin-bottom: 4px;
+    }
+    .analyst-card-desc {
+        font-size: 0.82rem;
+        color: #64748b;
+        line-height: 1.45;
+    }
+    .analyst-section-title {
+        font-size: 0.92rem;
+        font-weight: 600;
+        color: #1e293b;
+        margin-top: 20px;
+        margin-bottom: 10px;
+    }
+    .analyst-p {
+        font-size: 0.88rem;
+        color: #334155;
+        line-height: 1.65;
+        margin-bottom: 12px;
+    }
+    .strategy-card {
+        background-color: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-left: 3.5px solid #0284c7;
+        border-radius: 8px;
+        padding: 14px 16px;
+        margin-bottom: 12px;
+    }
+    .strategy-title {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: #0f172a;
+        margin-bottom: 4px;
+    }
+    .strategy-body {
+        font-size: 0.82rem;
+        color: #475569;
+        line-height: 1.55;
     }
     </style>
     """,
     unsafe_allow_html=True
 )
 
-# ── Load model & artefak dari folder project ─────────────────
-# Tanggal mulai training (Dec 2023) — untuk day_index yang konsisten
 TRAINING_START = pd.Timestamp('2023-12-31')
 
 @st.cache_resource
 def load_artifacts():
-    model  = joblib.load('model_xgb_tuned.pkl')
-    scaler = joblib.load('scaler.pkl')
-    with open('feature_columns.json') as f:
+    model  = joblib.load('best_model_weekly.pkl')
+    scaler = joblib.load('scaler_weekly.pkl')
+    with open('feature_columns_weekly.json') as f:
         meta = json.load(f)
     return model, scaler, meta
 
-# ── Baca file: support CSV dan XLSX ──────────────────────────
+
+# ════════════════════════════════════════════════════════════
+#  BAGIAN 2: FUNGSI PENGOLAHAN DATA & FORECASTING (WEEKLY FIXED)
+# ════════════════════════════════════════════════════════════
+from hijri_converter import Hijri, Gregorian
+import datetime
+
 def read_file(uploaded_file) -> pd.DataFrame:
     name = uploaded_file.name.lower()
     if name.endswith('.xlsx') or name.endswith('.xls'):
         return pd.read_excel(uploaded_file)
     else:
-        # Coba beberapa encoding umum untuk CSV Shopee
         for enc in ['utf-8', 'latin-1', 'cp1252']:
             try:
                 uploaded_file.seek(0)
@@ -475,1228 +613,1439 @@ def read_file(uploaded_file) -> pd.DataFrame:
         uploaded_file.seek(0)
         return pd.read_csv(uploaded_file, encoding='utf-8', errors='replace')
 
-# ── Cleaning RAW Shopee → DataFrame bersih ───────────────────
 def clean_raw(df_raw: pd.DataFrame) -> pd.DataFrame:
-    """Identik dengan logika 01_data_preparation.py"""
     df = df_raw.copy()
-
-    # Normalisasi kolom tanggal
     if 'Waktu Pengiriman Diatur' in df.columns and 'Waktu Pesanan Dibuat' not in df.columns:
         df = df.rename(columns={'Waktu Pengiriman Diatur': 'Waktu Pesanan Dibuat'})
 
-    # Fix Total Pembayaran: "35.663" → 35663.0
     if 'Total Pembayaran' in df.columns:
-        df['Total Pembayaran'] = (
-            df['Total Pembayaran'].astype(str)
-            .str.replace('.', '', regex=False)
-            .str.replace(',', '.', regex=False)
-        )
+        df['Total Pembayaran'] = df['Total Pembayaran'].astype(str).str.replace('.', '', regex=False).str.replace(',', '.', regex=False)
         df['Total Pembayaran'] = pd.to_numeric(df['Total Pembayaran'], errors='coerce')
 
-    # Fix Total Berat: "600 gr" → 600.0
-    if 'Total Berat' in df.columns:
-        df['Total Berat'] = (
-            df['Total Berat'].astype(str)
-            .str.extract(r'([\d,]+)')[0]
-            .str.replace(',', '.', regex=False)
-        )
-        df['Total Berat'] = pd.to_numeric(df['Total Berat'], errors='coerce')
-
-    # Normalisasi & filter status Selesai
     if 'Status Pesanan' in df.columns:
-        df['Status Pesanan'] = df['Status Pesanan'].apply(
-            lambda x: 'Selesai' if str(x).startswith('Pesanan diterima') else x
-        )
+        df['Status Pesanan'] = df['Status Pesanan'].apply(lambda x: 'Selesai' if str(x).startswith('Pesanan diterima') else x)
         df = df[df['Status Pesanan'] == 'Selesai'].copy()
 
-    # Buang pembayaran 0 / NaN
     if 'Total Pembayaran' in df.columns:
         df = df[df['Total Pembayaran'] > 0].copy()
 
-    # Isi NaN kolom non-kritis
-    for col, val in [('Alasan Pembatalan', 'Tidak Ada'),
-                     ('Returned quantity', 0),
-                     ('Total Diskon', 0)]:
-        if col in df.columns:
-            df[col] = df[col].fillna(val)
-
-    # Parse tanggal
     if 'Waktu Pesanan Dibuat' in df.columns:
-        df['Waktu Pesanan Dibuat'] = pd.to_datetime(
-            df['Waktu Pesanan Dibuat'], errors='coerce')
+        df['Waktu Pesanan Dibuat'] = pd.to_datetime(df['Waktu Pesanan Dibuat'], errors='coerce')
         df['order_date'] = df['Waktu Pesanan Dibuat'].dt.normalize()
 
     return df.reset_index(drop=True)
 
-# ── Agregasi ke level harian ──────────────────────────────────
-def make_daily(df_clean: pd.DataFrame) -> pd.DataFrame:
-    # Deduplikasi order_id (multi-item order)
-    df_order = (df_clean.drop_duplicates(subset='order_id', keep='first')
-                if 'order_id' in df_clean.columns else df_clean.copy())
+def make_weekly(df_clean: pd.DataFrame) -> pd.DataFrame:
+    df_order = (df_clean.drop_duplicates(subset='order_id', keep='first') if 'order_id' in df_clean.columns else df_clean.copy())
+    weekly = df_order.groupby(pd.Grouper(key='order_date', freq='W'))['Total Pembayaran'].sum().reset_index()
+    weekly = weekly.rename(columns={'order_date': 'order_week', 'Total Pembayaran': 'total_revenue'})
+    
+    full_range = pd.date_range(weekly['order_week'].min(), weekly['order_week'].max(), freq='W')
+    weekly = weekly.set_index('order_week').reindex(full_range).reset_index().rename(columns={'index': 'order_week'})
+    weekly['total_revenue'] = weekly['total_revenue'].fillna(0)
+    return weekly.sort_values('order_week').reset_index(drop=True)
 
-    daily = (
-        df_order.groupby('order_date')['Total Pembayaran']
-        .sum().reset_index()
-        .rename(columns={'Total Pembayaran': 'total_revenue'})
-    )
-    # Isi missing dates dengan 0
-    full = pd.date_range(daily['order_date'].min(),
-                         daily['order_date'].max(), freq='D')
-    daily = (daily.set_index('order_date')
-             .reindex(full).reset_index()
-             .rename(columns={'index': 'order_date'}))
-    daily['total_revenue'] = daily['total_revenue'].fillna(0)
-    daily['order_date']    = pd.to_datetime(daily['order_date'])
-    return daily.sort_values('order_date').reset_index(drop=True)
-
-# ── Feature engineering (identik dengan 02c) ─────────────────
-def build_features_daily(df: pd.DataFrame,
-                         median_nonzero: float = None,
-                         training_start: pd.Timestamp = None) -> pd.DataFrame:
-    """
-    median_nonzero: jika diberikan, hari dengan revenue=0 akan di-impute
-    dengan nilai ini HANYA untuk komputasi lag (bukan untuk kolom total_revenue).
-    Ini mencegah lag=0 saat data punya banyak hari tutup (Lebaran, dll).
-    """
+def build_features_weekly(df: pd.DataFrame, median_nonzero: float = None, training_start: pd.Timestamp = None) -> pd.DataFrame:
     df  = df.copy()
-    df['order_date'] = pd.to_datetime(df['order_date'])
-    doy = df['order_date'].dt.dayofyear
+    df['order_week'] = pd.to_datetime(df['order_week'])
+    
+    # MURNI FITUR MINGGUAN (TIDAK ADA DAY ATAU DAYOFWEEK)
+    df['year'] = df['order_week'].dt.year
+    df['month'] = df['order_week'].dt.month
+    df['week_of_year'] = df['order_week'].dt.isocalendar().week.astype(int)
+    df['quarter'] = df['order_week'].dt.quarter
+    
+    def get_ramadan_dates(year):
+        hijri_year = Gregorian(year, 3, 1).to_hijri().year 
+        ram_start = Hijri(hijri_year, 9, 1).to_gregorian()
+        eid_day = Hijri(hijri_year, 10, 1).to_gregorian()
+        return datetime.date(ram_start.year, ram_start.month, ram_start.day), datetime.date(eid_day.year, eid_day.month, eid_day.day)
 
-    df['year']           = df['order_date'].dt.year
-    df['month']          = df['order_date'].dt.month
-    df['day']            = df['order_date'].dt.day
-    df['dayofweek']      = df['order_date'].dt.dayofweek
-    df['quarter']        = df['order_date'].dt.quarter
-    df['week_of_year']   = df['order_date'].dt.isocalendar().week.astype(int)
-    df['is_weekend']     = df['dayofweek'].isin([5,6]).astype(int)
-    df['is_month_start'] = (df['day'] <= 5).astype(int)
-    df['is_month_end']   = (df['day'] >= 25).astype(int)
-    df['is_ramadan']     = (
-        ((df['month'] == 3) & (df['year'].isin([2024,2025,2026]))) |
-        ((df['month'] == 4) & (df['year'].isin([2024,2025])))
-    ).astype(int)
-    df['is_harbolnas']   = (
-        (df['month']==12) & (df['day']>=10) & (df['day']<=12)
-    ).astype(int)
-    # is_holiday_gap: untuk baris FORECAST (placeholder), jangan tandai sebagai hari tutup
+    def check_harbolnas(week_end_date):
+        dates_in_week = [week_end_date - datetime.timedelta(days=i) for i in range(7)]
+        for d in dates_in_week:
+            if d.month == 12 and d.day in [10, 11, 12]: return 1
+        return 0
+
+    is_ram_list, is_harb_list = [], []
+    for dt in df['order_week'].dt.date:
+        r_start, eid = get_ramadan_dates(dt.year)
+        w_start = dt - datetime.timedelta(days=6)
+        is_ram_list.append(1 if (w_start <= eid) and (dt >= r_start) else 0)
+        is_harb_list.append(check_harbolnas(dt))
+        
+    df['is_ramadan'] = is_ram_list
+    df['is_harbolnas'] = is_harb_list
+
     if 'is_forecast_placeholder' in df.columns:
-        df['is_holiday_gap'] = ((df['total_revenue'] == 0) &
-                                (df['is_forecast_placeholder'] != 1)).astype(int)
+        df['is_holiday_gap'] = ((df['total_revenue'] == 0) & (df['is_forecast_placeholder'] != 1)).astype(int)
     else:
         df['is_holiday_gap'] = (df['total_revenue'] == 0).astype(int)
-    df['sin_week']       = np.sin(2*np.pi*df['dayofweek']/7)
-    df['cos_week']       = np.cos(2*np.pi*df['dayofweek']/7)
-    df['sin_month']      = np.sin(2*np.pi*df['month']/12)
-    df['cos_month']      = np.cos(2*np.pi*df['month']/12)
-    df['sin_year']       = np.sin(2*np.pi*doy/365)
-    df['cos_year']       = np.cos(2*np.pi*doy/365)
-    # day_index harus relatif terhadap tanggal mulai TRAINING
-    ref_date = training_start if training_start is not None else df['order_date'].min()
-    df['day_index'] = (df['order_date'] - ref_date).dt.days
 
-    # Untuk lag: hari tutup (revenue=0) di-impute dengan median non-zero
-    if median_nonzero is not None and median_nonzero > 0:
-        rev_for_lag = df['total_revenue'].replace(0, median_nonzero)
-    else:
-        rev_for_lag = df['total_revenue']
+    df['sin_month'] = np.sin(2 * np.pi * df['month'] / 12)
+    df['cos_month'] = np.cos(2 * np.pi * df['month'] / 12)
+    df['sin_year']  = np.sin(2 * np.pi * df['week_of_year'] / 52)
+    df['cos_year']  = np.cos(2 * np.pi * df['week_of_year'] / 52)
+    
+    ref_date = training_start if training_start is not None else df['order_week'].min()
+    df['week_index'] = (df['order_week'] - ref_date).dt.days // 7
 
-    df['lag_1']           = rev_for_lag.shift(1)
-    df['lag_7']           = rev_for_lag.shift(7)
-    df['lag_30']          = rev_for_lag.shift(30)
-    df['rolling_7d_mean'] = rev_for_lag.shift(1).rolling(7,  min_periods=1).mean()
-    df['rolling_30d_mean']= rev_for_lag.shift(1).rolling(30, min_periods=1).mean()
+    rev_for_lag = df['total_revenue'].replace(0, median_nonzero) if (median_nonzero is not None and median_nonzero > 0) else df['total_revenue']
+
+    # MURNI LAG MINGGUAN (Aman untuk data pendek berkat fillna(0))
+    df['lag_1'] = rev_for_lag.shift(1).fillna(0)
+    df['lag_4'] = rev_for_lag.shift(4).fillna(0)
+    df['lag_12'] = rev_for_lag.shift(12).fillna(0)
+    df['rolling_4w_mean']  = rev_for_lag.shift(1).rolling(4, min_periods=1).mean().fillna(0)
+    df['rolling_12w_mean'] = rev_for_lag.shift(1).rolling(12, min_periods=1).mean().fillna(0)
+    
     return df
 
-# ── Forecast rolling ──────────────────────────────────────────
-def run_forecast(model, scaler, meta, daily_hist: pd.DataFrame, n_days: int):
-    df_roll    = daily_hist.copy()
+def run_forecast_weekly(model, scaler, meta, weekly_hist: pd.DataFrame, n_weeks: int):
+    df_roll    = weekly_hist.copy()
     preds      = []
-    last_dt    = df_roll['order_date'].max()
+    last_dt    = df_roll['order_week'].max()
+    
     SCALE_COLS = meta['scale_cols']
+    EXPECTED_FEATURES = meta['features'] # List fitur MINGGUAN eksak dari model
 
     nonzero_vals = df_roll.loc[df_roll['total_revenue'] > 0, 'total_revenue']
-    median_nz = float(nonzero_vals.median()) if len(nonzero_vals) > 0 else 1_000_000.0
+    median_nz = float(nonzero_vals.median()) if len(nonzero_vals) > 0 else 5_000_000.0
 
-    for i in range(n_days):
-        future_dt = last_dt + timedelta(days=i+1)
-        placeholder = pd.DataFrame([{'order_date': future_dt,
-                                      'total_revenue': 0,
-                                      'is_forecast_placeholder': 1}])
+    for i in range(n_weeks):
+        future_dt = last_dt + timedelta(weeks=i+1)
+        placeholder = pd.DataFrame([{'order_week': future_dt, 'total_revenue': 0, 'is_forecast_placeholder': 1}])
         temp = pd.concat([df_roll, placeholder], ignore_index=True)
-        temp = build_features_daily(temp, median_nonzero=median_nz,
-                                    training_start=TRAINING_START)
+        
+        # Buat fitur mingguan
+        temp = build_features_weekly(temp, median_nonzero=median_nz, training_start=TRAINING_START)
         row  = temp.iloc[[-1]].copy()
 
-        for col in meta['features']:
+        # -------------------------------------------------------------
+        # PENGUNCI KOLOM (Mencegah Error 'feature_names mismatch')
+        # 1. Pastikan semua kolom yang diminta model tersedia (isi 0 jika tidak ada)
+        for col in EXPECTED_FEATURES:
             if col not in row.columns:
                 row[col] = 0
+        
+        # 2. Isolasi HANYA kolom yang diminta model dengan URUTAN yang sama persis
+        X = row[EXPECTED_FEATURES].copy()
+        # -------------------------------------------------------------
 
-        X = row[meta['features']].copy()
-
-        # Scale fitur menggunakan scaler yang di-fit saat training
         X_scaled = X.copy()
         scale_present = [c for c in SCALE_COLS if c in X_scaled.columns]
         if scale_present:
             X_scaled[scale_present] = scaler.transform(X[scale_present])
 
+        # Eksekusi prediksi
         y_idr = max(0.0, float(np.expm1(model.predict(X_scaled)[0])))
-        preds.append({'order_date': future_dt, 'predicted_revenue': y_idr})
+        preds.append({'order_week': future_dt, 'predicted_revenue': y_idr})
 
-        df_roll = pd.concat([
-            df_roll,
-            pd.DataFrame([{'order_date': future_dt, 'total_revenue': y_idr}])
-        ], ignore_index=True)
-
+        # Gabungkan hasil untuk putaran iterasi selanjutnya
+        df_roll = pd.concat([df_roll, pd.DataFrame([{'order_week': future_dt, 'total_revenue': y_idr}])], ignore_index=True)
         if y_idr > 0:
-            median_nz = float(
-                df_roll.loc[df_roll['total_revenue'] > 0, 'total_revenue'].median()
-            )
+            median_nz = float(df_roll.loc[df_roll['total_revenue'] > 0, 'total_revenue'].median())
 
     return pd.DataFrame(preds)
 
-
-# ════════════════════════════════════════════════════════════
-#  HELPER FUNCTIONS — CHATBOT AI AGENT
-#  (didefinisikan SEBELUM routing agar tidak NameError)
-# ════════════════════════════════════════════════════════════
-
-def _demo_response(prompt: str) -> str:
-    """Fallback response saat GOOGLE_API_KEY belum diset."""
-    p = prompt.lower()
-    if any(k in p for k in ['produk', 'terlaris', 'kategori']):
-        return (
-            '**Analisis Produk** membutuhkan `GOOGLE_API_KEY`.\n\n'
-            'Setelah key diset, agent akan otomatis membuat grafik top produk terlaris.'
-        )
-    elif any(k in p for k in ['revenue', 'pendapatan', 'omzet', 'penjualan']):
-        return (
-            '**Lihat Dashboard Forecasting** untuk prediksi revenue 1–3 bulan ke depan.\n\n'
-            'Atau tambahkan `GOOGLE_API_KEY` untuk analisis mendalam via chatbot.'
-        )
-    elif any(k in p for k in ['kompetitor', 'harga', 'shopee', 'tokopedia', 'pasar']):
-        return (
-            '**Riset Kompetitor** membutuhkan `TAVILY_API_KEY`.\n\n'
-            'Daftar gratis di [tavily.com](https://tavily.com) untuk Web Search tool.'
-        )
-    elif any(k in p for k in ['grafik', 'chart', 'plot', 'visualisasi']):
-        return (
-            '**Buat Grafik** membutuhkan `GOOGLE_API_KEY` untuk Python REPL tool.\n\n'
-            'Agent akan mengeksekusi kode Python dan menampilkan grafik otomatis.'
-        )
+def generate_forecast_analyst_insights(weekly_hist: pd.DataFrame, df_forecast: pd.DataFrame, horizon: int) -> dict:
+    """
+    Menghasilkan analisis komprehensif layaknya seorang Data Analyst profesional:
+    - Menghitung momentum tren, arah pergerakan, dan perbandingan terhadap riwayat historis
+    - Mengidentifikasi titik kritis penjualan (Peak & Trough) serta estimasi kalender
+    - Mengukur volatilitas dan stabilitas perkiraan pendapatan
+    - Menyusun rekomendasi bisnis konkret (Stok/Inventaris, Pemasaran, dan Arus Kas)
+    """
+    n_hist = len(weekly_hist)
+    avg_hist_all = float(weekly_hist['total_revenue'].mean()) if n_hist > 0 else 0.0
+    
+    recent_k = min(n_hist, max(4, horizon))
+    avg_hist_recent = float(weekly_hist['total_revenue'].tail(recent_k).mean()) if n_hist > 0 else 0.0
+    last_actual_rev = float(weekly_hist['total_revenue'].iloc[-1]) if n_hist > 0 else 0.0
+    
+    total_pred = float(df_forecast['predicted_revenue'].sum())
+    avg_pred = float(df_forecast['predicted_revenue'].mean())
+    min_pred = float(df_forecast['predicted_revenue'].min())
+    max_pred = float(df_forecast['predicted_revenue'].max())
+    
+    peak_idx = df_forecast['predicted_revenue'].idxmax()
+    peak_row = df_forecast.loc[peak_idx]
+    peak_dt = peak_row['order_week']
+    peak_rev = float(peak_row['predicted_revenue'])
+    peak_dt_str = peak_dt.strftime('%d %b %Y')
+    
+    trough_idx = df_forecast['predicted_revenue'].idxmin()
+    trough_row = df_forecast.loc[trough_idx]
+    trough_dt = trough_row['order_week']
+    trough_rev = float(trough_row['predicted_revenue'])
+    trough_dt_str = trough_dt.strftime('%d %b %Y')
+    
+    growth_vs_recent_pct = ((avg_pred - avg_hist_recent) / (avg_hist_recent + 1e-9)) * 100 if avg_hist_recent > 0 else 0.0
+    growth_vs_all_pct = ((avg_pred - avg_hist_all) / (avg_hist_all + 1e-9)) * 100 if avg_hist_all > 0 else 0.0
+    growth_vs_last_pct = ((avg_pred - last_actual_rev) / (last_actual_rev + 1e-9)) * 100 if last_actual_rev > 0 else 0.0
+    
+    mid = max(1, len(df_forecast) // 2)
+    h1_avg = float(df_forecast.iloc[:mid]['predicted_revenue'].mean())
+    h2_avg = float(df_forecast.iloc[mid:]['predicted_revenue'].mean())
+    slope_pct = ((h2_avg - h1_avg) / (h1_avg + 1e-9)) * 100
+    
+    if slope_pct > 3.0:
+        trend_status = "Tren Menguat (Upward Trajectory)"
+        trend_summary = f"Proyeksi menunjukkan laju penjualan meningkat {abs(slope_pct):.1f}% di paruh kedua horizon."
+    elif slope_pct < -3.0:
+        trend_status = "Tren Normalisasi (Gradual Correction)"
+        trend_summary = f"Proyeksi melandai sekitar {abs(slope_pct):.1f}% di paruh kedua horizon waktu."
     else:
-        return (
-            '**API Key belum diset.**\n\n'
-            'Tambahkan di `.streamlit/secrets.toml`:\n'
-            '```toml\n'
-            'GOOGLE_API_KEY = "AIza..."  # wajib\n'
-            'TAVILY_API_KEY = "tvly-..."  # opsional (Web Search)\n'
-            '```\n\n'
-            'Dapatkan gratis di [aistudio.google.com](https://aistudio.google.com/app/apikey)'
-        )
+        trend_status = "Tren Konsisten (Steady Plateau)"
+        trend_summary = f"Proyeksi bergerak stabil dalam batas normal (variasi antarfase hanya {abs(slope_pct):.1f}%)."
 
+    peak_above_avg = ((peak_rev - avg_pred) / (avg_pred + 1e-9)) * 100
+    trough_below_avg = ((avg_pred - trough_rev) / (avg_pred + 1e-9)) * 100
+    
+    std_pred = float(df_forecast['predicted_revenue'].std()) if len(df_forecast) > 1 else 0.0
+    cv_pct = (std_pred / (avg_pred + 1e-9)) * 100
+    
+    if cv_pct < 12.0:
+        volatility_status = "Volatilitas Rendah (Stabil & Terprediksi)"
+        volatility_summary = f"Koefisien variasi {cv_pct:.1f}%, pergerakan pendapatan mingguan terpantau sangat stabil."
+    elif cv_pct <= 25.0:
+        volatility_status = "Volatilitas Moderat (Fluktuasi Wajar)"
+        volatility_summary = f"Koefisien variasi {cv_pct:.1f}%, dinamika penjualan mencerminkan siklus transaksi ritel mingguan."
+    else:
+        volatility_status = "Volatilitas Tinggi (Fluktuasi Signifikan)"
+        volatility_summary = f"Koefisien variasi {cv_pct:.1f}%, terdapat perbedaan omzet yang cukup tajam antarminggu."
+
+    growth_direction = "tumbuh positif" if growth_vs_recent_pct >= 0 else "mengalami kontraksi"
+    narrative_diagnosis = (
+        f"Berdasarkan hasil analisis data historis dan peramalan model, rata-rata pendapatan mingguan toko untuk {horizon} minggu ke depan "
+        f"diproyeksikan mencapai <strong>Rp {avg_pred:,.0f}</strong>. Angka ini mencerminkan dinamika {growth_direction} "
+        f"sebesar <strong>{abs(growth_vs_recent_pct):.1f}%</strong> dibandingkan rata-rata penjualan riil {recent_k} minggu terakhir "
+        f"(Rp {avg_hist_recent:,.0f}). Total akumulasi omzet yang dapat dicapai toko sepanjang horizon waktu ini diperkirakan berada di kisaran <strong>Rp {total_pred:,.0f}</strong>."
+    )
+    
+    months_in_horizon = df_forecast['order_week'].dt.month.unique().tolist()
+    seasonal_notes = []
+    if any(m in [3, 4] for m in months_in_horizon):
+        seasonal_notes.append("fase persiapan dan puncak musiman Ramadan / Idulfitri")
+    if any(m in [11, 12] for m in months_in_horizon):
+        seasonal_notes.append("momentum belanja Harbolnas dan promo akhir tahun (11.11 / 12.12)")
+    
+    seasonal_str = f" Periode ini turut dipengaruhi oleh {', '.join(seasonal_notes)}, yang berpotensi menjadi pendorong daya beli pelanggan." if seasonal_notes else ""
+    
+    narrative_pattern = (
+        f"Analisis sebaran mingguan menunjukkan bahwa momen penjualan tertinggi diproyeksikan terjadi pada minggu <strong>{peak_dt_str}</strong> "
+        f"dengan estimasi penerimaan mencapai <strong>Rp {peak_rev:,.0f}</strong> ({peak_above_avg:+.1f}% di atas rata-rata mingguan). "
+        f"Sedangkan titik pendapatan terendah diproyeksikan terjadi pada minggu <strong>{trough_dt_str}</strong> di kisaran <strong>Rp {trough_rev:,.0f}</strong>.{seasonal_str} "
+        f"Rentang selisih sebesar Rp {peak_rev - trough_rev:,.0f} memerlukan antisipasi kesiapan stok dan alokasi modal kerja yang adaptif."
+    )
+    
+    reorder_dt = peak_dt - timedelta(days=10)
+    reorder_dt_str = reorder_dt.strftime('%d %b %Y')
+    
+    rec_inventory = (
+        f"Lakukan pemesanan ulang (restocking) barang dagang paling lambat sekitar tanggal <strong>{reorder_dt_str}</strong> "
+        f"(7–10 hari sebelum minggu puncak {peak_dt_str}). Pastikan ketersediaan stok produk unggulan Anda ditingkatkan sekitar <strong>{min(50, max(15, int(peak_above_avg)))}%</strong> "
+        f"untuk memenuhi potensi lonjakan pesanan dan mencegah hilangnya potensi penjualan (stockout). "
+        f"Pada minggu {trough_dt_str}, tahan penumpukan stok baru untuk menjaga perputaran modal dan efisiensi ruang simpan."
+    )
+    
+    rec_marketing = (
+        f"Tingkatkan anggaran kampanye iklan toko 1 minggu menjelang <strong>{peak_dt_str}</strong> "
+        f"untuk memaksimalkan tingkat konversi saat minat belanja konsumen berada di titik tertinggi. Sebaliknya, pada minggu dengan estimasi omzet lebih rendah "
+        f"(sekitar {trough_dt_str}), terapkan program penawaran khusus seperti <em>bundle combo</em>, voucher toko berbatas waktu, atau penyesuaian harga khusus "
+        f"guna memacu transaksi dan menjaga kontinuitas penjualan."
+    )
+    
+    rec_cashflow = (
+        f"Jadikan estimasi pendapatan terendah sebesar <strong>Rp {trough_rev:,.0f}</strong> sebagai tolok ukur batas aman likuiditas (<em>baseline safety buffer</em>) "
+        f"dalam menyusun pengeluaran operasional mingguan. Siapkan cadangan kas operasional lebih dini sebelum tanggal {reorder_dt_str} "
+        f"agar pengadaan barang untuk minggu puncak berjalan lancar tanpa mengganggu kesehatan arus kas toko."
+    )
+
+    return {
+        'total_pred': total_pred,
+        'avg_pred': avg_pred,
+        'min_pred': min_pred,
+        'max_pred': max_pred,
+        'peak_dt_str': peak_dt_str,
+        'peak_rev': peak_rev,
+        'trough_dt_str': trough_dt_str,
+        'trough_rev': trough_rev,
+        'growth_vs_recent_pct': growth_vs_recent_pct,
+        'growth_vs_all_pct': growth_vs_all_pct,
+        'trend_status': trend_status,
+        'trend_summary': trend_summary,
+        'volatility_status': volatility_status,
+        'volatility_summary': volatility_summary,
+        'peak_above_avg': peak_above_avg,
+        'narrative_diagnosis': narrative_diagnosis,
+        'narrative_pattern': narrative_pattern,
+        'rec_inventory': rec_inventory,
+        'rec_marketing': rec_marketing,
+        'rec_cashflow': rec_cashflow,
+    }
+
+
+def generate_historical_analyst_insights(df: pd.DataFrame, weekly: pd.DataFrame) -> dict:
+    total_revenue = float(weekly['total_revenue'].sum()) if len(weekly) > 0 else 0.0
+    avg_weekly = float(weekly['total_revenue'].mean()) if len(weekly) > 0 else 0.0
+    n_weeks = len(weekly)
+    
+    # Deteksi Titik Puncak dan Terendah
+    if len(weekly) > 0:
+        peak_idx = weekly['total_revenue'].idxmax()
+        peak_row = weekly.loc[peak_idx]
+        peak_date_str = peak_row['order_week'].strftime('%d %b %Y')
+        peak_revenue = float(peak_row['total_revenue'])
+        
+        nonzero_w = weekly[weekly['total_revenue'] > 0]
+        if len(nonzero_w) > 0:
+            trough_idx = nonzero_w['total_revenue'].idxmin()
+            trough_row = nonzero_w.loc[trough_idx]
+        else:
+            trough_idx = weekly['total_revenue'].idxmin()
+            trough_row = weekly.loc[trough_idx]
+            
+        trough_date_str = trough_row['order_week'].strftime('%d %b %Y')
+        trough_revenue = float(trough_row['total_revenue'])
+    else:
+        peak_date_str, trough_date_str = "—", "—"
+        peak_revenue, trough_revenue = 0.0, 0.0
+
+    peak_above_avg = ((peak_revenue - avg_weekly) / (avg_weekly + 1e-9)) * 100
+    peak_share_pct = (peak_revenue / (total_revenue + 1e-9)) * 100
+
+    # Total Pesanan & Average Order Value (AOV)
+    total_orders = len(df['order_id'].unique()) if 'order_id' in df.columns else len(df)
+    aov = total_revenue / (total_orders + 1e-9)
+
+    # Volatilitas & Koefisien Variasi (CV)
+    std_rev = float(weekly['total_revenue'].std()) if len(weekly) > 1 else 0.0
+    cv_pct = (std_rev / (avg_weekly + 1e-9)) * 100
+
+    if cv_pct > 35.0 or peak_above_avg > 75.0:
+        volatility_status = "Pola Berfluktuasi Tinggi (Spike-Driven)"
+        volatility_desc = f"Penjualan sangat terkonsentrasi pada minggu puncak ({peak_date_str}), yang menyumbang {peak_share_pct:.1f}% dari keseluruhan omzet toko."
+    elif cv_pct > 18.0:
+        volatility_status = "Pola Moderat (Dinamis)"
+        volatility_desc = f"Penjualan mingguan mengalami variasi wajar dengan selisih puncak {peak_above_avg:+.1f}% di atas rata-rata."
+    else:
+        volatility_status = "Pola Stabil"
+        volatility_desc = "Penjualan mingguan bergerak konsisten dengan fluktuasi rendah antarfase."
+
+    # Penurunan Pasca-Puncak (Post-Peak Contraction)
+    last_week_rev = float(weekly.iloc[-1]['total_revenue']) if len(weekly) > 0 else 0.0
+    last_week_date = weekly.iloc[-1]['order_week'].strftime('%d %b %Y') if len(weekly) > 0 else "—"
+    if peak_revenue > last_week_rev and peak_revenue > 0:
+        drop_from_peak_pct = ((peak_revenue - last_week_rev) / peak_revenue) * 100
+    else:
+        drop_from_peak_pct = 0.0
+
+    # Analisis Hari Transaksi Teramai
+    top_day_name = "Senin"
+    top_day_pct = 0.0
+    top_day_count = 0
+    if 'Waktu Pesanan Dibuat' in df.columns:
+        valid_dates = pd.to_datetime(df['Waktu Pesanan Dibuat'], errors='coerce').dropna()
+        if len(valid_dates) > 0:
+            day_map = {0: 'Senin', 1: 'Selasa', 2: 'Rabu', 3: 'Kamis', 4: 'Jumat', 5: 'Sabtu', 6: 'Minggu'}
+            counts = valid_dates.dt.dayofweek.map(day_map).value_counts()
+            if len(counts) > 0:
+                top_day_name = counts.index[0]
+                top_day_count = int(counts.iloc[0])
+                top_day_pct = (top_day_count / len(valid_dates)) * 100
+
+    # Analisis Kategori / Produk Unggulan (Dinamis dari Kolom yang Tersedia)
+    top_prod_name = "Produk Utama"
+    top_prod_share = 100.0
+    n_categories = 1
+    
+    prod_col_candidates = [c for c in ['product_category', 'Nama Produk', 'Kategori', 'nama_produk'] if c in df.columns]
+    if prod_col_candidates:
+        active_col = prod_col_candidates[0]
+        prod_grp = df.groupby(active_col)['Total Pembayaran'].sum().sort_values(ascending=False)
+        if len(prod_grp) > 0:
+            top_prod_name = str(prod_grp.index[0])
+            top_prod_share = (float(prod_grp.iloc[0]) / (total_revenue + 1e-9)) * 100
+            n_categories = len(prod_grp)
+
+    # Analisis Logistik (Dinamis)
+    top_courier = "Reguler / Standar"
+    top_courier_pct = 0.0
+    if 'Opsi Pengiriman' in df.columns:
+        c_counts = df['Opsi Pengiriman'].value_counts()
+        if len(c_counts) > 0:
+            top_courier = str(c_counts.index[0]).split('-')[0].strip()
+            top_courier_pct = (float(c_counts.iloc[0]) / (len(df) + 1e-9)) * 100
+
+    # Narasi Diagnosa Konteks Kalender & Musiman (100% Dinamis dari Tanggal Puncak)
+    seasonal_context = ""
+    if len(weekly) > 0 and peak_above_avg > 35.0:
+        peak_dt_val = peak_row['order_week']
+        peak_month = peak_dt_val.month
+        is_peak_ramadan = False
+        try:
+            r_start, eid = get_ramadan_dates(peak_dt_val.year)
+            w_start = peak_dt_val.date() - datetime.timedelta(days=6)
+            if (w_start <= eid) and (peak_dt_val.date() >= r_start):
+                is_peak_ramadan = True
+        except Exception:
+            pass
+
+        if is_peak_ramadan:
+            seasonal_context = " Lonjakan ini bertepatan dengan siklus musiman Ramadan dan Idulfitri, di mana intensitas belanja konsumen pada marketplace lazim mengalami eskalasi tinggi."
+        elif peak_month in [11, 12]:
+            seasonal_context = " Lonjakan ini selaras dengan momentum festival belanja kuartal akhir (kampanye Harbolnas 11.11 dan 12.12)."
+        elif peak_month in [6, 7]:
+            seasonal_context = " Lonjakan ini bertepatan dengan momentum libur tengah tahun dan persiapan tahun ajaran baru."
+        else:
+            seasonal_context = f" Lonjakan pada bulan {peak_dt_val.strftime('%B')} ini mengindikasikan keberhasilan kampanye promosi toko, program diskon berkala (seperti payday atau tanggal kembar), atau peningkatan eksposur produk pada minggu tersebut."
+
+    narrative_diag = (
+        f"Sepanjang periode <strong>{n_weeks} minggu</strong>, toko membukukan total pendapatan riil sebesar <strong>Rp {total_revenue:,.0f}</strong> "
+        f"dari <strong>{total_orders:,} transaksi selesai</strong>, dengan rata-rata penjualan <strong>Rp {avg_weekly:,.0f} per minggu</strong> "
+        f"dan nilai keranjang rata-rata (Average Order Value) sebesar <strong>Rp {aov:,.0f} per transaksi</strong>. "
+        f"Titik omzet tertinggi tercatat pada minggu <strong>{peak_date_str}</strong> sebesar <strong>Rp {peak_revenue:,.0f}</strong> "
+        f"({peak_above_avg:+.1f}% di atas baseline rata-rata mingguan). Satu minggu puncak ini menyumbang <strong>{peak_share_pct:.1f}%</strong> "
+        f"dari total pendapatan toko.{seasonal_context}"
+    )
+
+    if drop_from_peak_pct > 15.0:
+        drop_detail = f"mengalami kontraksi sebesar <strong>{drop_from_peak_pct:.1f}%</strong> ke angka <strong>Rp {last_week_rev:,.0f}</strong>"
+    elif drop_from_peak_pct > 0:
+        drop_detail = f"mengalami penyesuaian wajar sebesar <strong>{drop_from_peak_pct:.1f}%</strong> ke angka <strong>Rp {last_week_rev:,.0f}</strong>"
+    else:
+        drop_detail = f"tetap bertahan pada level optimalnya di kisaran <strong>Rp {last_week_rev:,.0f}</strong>"
+
+    narrative_drop = (
+        f"Pasca-minggu puncak, penjualan pada periode minggu terakhir ({last_week_date}) {drop_detail}. "
+        f"Dinamika ini mencerminkan elastisitas permintaan toko terhadap momentum promosi, "
+        f"sehingga toko memerlukan strategi stabilisasi agar perputaran kas di luar momen puncak tetap terjaga konsisten."
+    )
+
+    # Rekomendasi Aksi Data Analyst (Target AOV & Strategi Dihitung Dinamis dari Data)
+    target_aov_low = aov * 1.25
+    target_aov_high = aov * 1.50
+
+    rec_retention = (
+        f"Dari total <strong>{total_orders:,} pesanan</strong> yang berhasil dihimpun, minggu puncak ({peak_date_str}) merepresentasikan konsentrasi pelanggan terbesar ({peak_share_pct:.1f}% omzet). "
+        f"Segera luncurkan strategi retensi dengan mengirimkan voucher pembelian kedua (repeat-order voucher) dengan masa berlaku terbatas, "
+        f"guna mengonversi pembeli momentum menjadi pelanggan loyal dan mempertahankan omzet toko di minggu-minggu berikutnya."
+    )
+
+    if n_categories > 1:
+        bundling_strategy = f"kombinasikan produk kategori <strong>{top_prod_name}</strong> dengan produk kategori sekunder dalam bentuk <em>bundle promo</em>"
+    else:
+        bundling_strategy = f"hadirkan opsi paket kuantitas bertingkat (misal: beli 2 atau 3 unit lebih hemat) pada kategori <strong>{top_prod_name}</strong>"
+
+    rec_bundling = (
+        f"Kategori <strong>{top_prod_name}</strong> merupakan kontributor omzet terbesar ({top_prod_share:.1f}%). "
+        f"Dengan Average Order Value (AOV) riil saat ini sebesar <strong>Rp {aov:,.0f}</strong>, {bundling_strategy} "
+        f"untuk menaikkan nilai belanja rata-rata per transaksi sebesar 25%–50% ke kisaran <strong>Rp {target_aov_low:,.0f} – Rp {target_aov_high:,.0f}</strong>."
+    )
+
+    rec_timing = (
+        f"Data transaksi menunjukkan bahwa hari <strong>{top_day_name}</strong> mencatat volume pemesanan tertinggi "
+        f"({top_day_count} pesanan atau {top_day_pct:.1f}% dari keseluruhan transaksi). "
+        f"Fokuskan anggaran iklan toko, penayangan siaran langsung (live streaming), dan rilis kupon diskon pada hari {top_day_name} "
+        f"guna mengoptimalkan rasio konversi. Pertahankan pula opsi logistik <strong>{top_courier}</strong> "
+        f"yang menjadi preferensi pengiriman terbanyak ({top_courier_pct:.1f}% pesanan)."
+    )
+
+    return {
+        'total_revenue': total_revenue,
+        'avg_weekly': avg_weekly,
+        'n_weeks': n_weeks,
+        'total_orders': total_orders,
+        'aov': aov,
+        'peak_date_str': peak_date_str,
+        'peak_revenue': peak_revenue,
+        'trough_date_str': trough_date_str,
+        'trough_revenue': trough_revenue,
+        'peak_above_avg': peak_above_avg,
+        'peak_share_pct': peak_share_pct,
+        'volatility_status': volatility_status,
+        'volatility_desc': volatility_desc,
+        'last_week_rev': last_week_rev,
+        'last_week_date': last_week_date,
+        'drop_from_peak_pct': drop_from_peak_pct,
+        'top_day_name': top_day_name,
+        'top_day_pct': top_day_pct,
+        'top_day_count': top_day_count,
+        'top_prod_name': top_prod_name,
+        'top_prod_share': top_prod_share,
+        'top_courier': top_courier,
+        'narrative_diag': narrative_diag,
+        'narrative_drop': narrative_drop,
+        'rec_retention': rec_retention,
+        'rec_bundling': rec_bundling,
+        'rec_timing': rec_timing,
+    }
+
+
+# ════════════════════════════════════════════════════════════
+#  BAGIAN 3: AI AGENT LOGIC (DIIMPOR DARI agent_core.py)
+# ════════════════════════════════════════════════════════════
+from agent_core import (
+    custom_marketplace_scraper,
+    python_repl,
+    get_agent_tools,
+    build_agent,
+    demo_response as _demo_response,
+    extract_text_content as _extract_text_content,
+    parse_ai_error_details,
+    SYSTEM_PROMPT,
+    DEFAULT_MODEL,
+    SUPPORTED_MODELS,
+)
+
+def render_error_diagnostics(diag: dict):
+    """Menampilkan kotak diagnosa kegagalan koneksi AI yang rapi, profesional, dan solutif."""
+    html = f"""
+    <div style="background-color: #ffffff; border: 1px solid #fee2e2; border-left: 4px solid {diag['badge_color']}; border-radius: 8px; padding: 16px 18px; margin: 12px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+            <span style="font-weight: 700; color: #0f172a; font-size: 0.95rem;">{diag['title']}</span>
+            <span style="font-size: 0.72rem; font-weight: 600; color: {diag['badge_color']}; background: {diag['badge_bg']}; padding: 2px 8px; border-radius: 999px;">{diag['badge']}</span>
+        </div>
+        <div style="font-size: 0.84rem; color: #334155; margin-bottom: 8px; line-height: 1.55;">
+            <strong>Penyebab:</strong> {diag['cause']}
+        </div>
+        <div style="font-size: 0.84rem; color: #0f172a; margin-bottom: 12px; line-height: 1.55; background: #f8fafc; padding: 10px 12px; border-radius: 6px; border: 1px solid #e2e8f0;">
+            <strong>Solusi yang Disarankan:</strong> {diag['solution']}
+        </div>
+        <details style="font-size: 0.76rem; color: #64748b; cursor: pointer;">
+            <summary style="font-weight: 500; color: #64748b;">Rincian Pesan Teknis</summary>
+            <pre style="background: #f1f5f9; padding: 10px; border-radius: 6px; margin-top: 6px; overflow-x: auto; white-space: pre-wrap; font-family: monospace; font-size: 0.72rem; color: #334155;">{diag['technical']}</pre>
+        </details>
+    </div>
+    """
+    st.markdown(html, unsafe_allow_html=True)
+
+# ════════════════════════════════════════════════════════════
+#  BAGIAN 4: STREAMLIT CACHED AGENT INITIALIZATION
+# ════════════════════════════════════════════════════════════
 
 @st.cache_resource
-def _init_agent(_google_api_key: str, _tavily_api_key: str = "", _model: str = "gemini-1.5-flash"):
+def _init_agent(_google_api_key: str, _model: str = "gemini-3.5-flash-lite"):
     """
-    Inisialisasi LangGraph ReAct Agent (kompatibel LangChain 1.x).
-
-    Arsitektur sesuai brief:
-    - LLM   : Gemini (Google GenAI) via langchain-google-genai 4.x
-    - Tool 1: Python REPL — analisis data & buat grafik otomatis
-    - Tool 2: Tavily Web Search — riset harga kompetitor (opsional)
-    - Pola  : ReAct (Reasoning + Acting) via langgraph.prebuilt
-
-    CATATAN BREAKING CHANGES LangChain 1.x:
-    - AgentExecutor DIHAPUS → gunakan langgraph.prebuilt.create_react_agent
-    - convert_system_message_to_human DIHAPUS dari ChatGoogleGenerativeAI
-    - Invoke format berubah: {messages: [(human, input)]} → result[messages][-1]
+    Wrapper Streamlit cache_resource yang memanggil build_agent dari agent_core.py.
+    Mempertahankan kompatibilitas penuh dengan pemanggilan UI dan fungsi .clear().
     """
-    import warnings
-    warnings.filterwarnings('ignore')
+    return build_agent(google_api_key=_google_api_key, model=_model)
 
-    # ── Import LangGraph (LangChain 1.x) ─────────────────────
-    from langchain_google_genai import ChatGoogleGenerativeAI
-    from langchain_experimental.tools.python.tool import PythonREPLTool
-    from langgraph.prebuilt import create_react_agent   # BUKAN langchain.agents
-
-    # ── LLM: Gemini dengan model yang dipilih ────────────────
-    # Model fallback order: gemini-2.0-flash → gemini-1.5-flash → gemini-1.5-flash-8b
-    # convert_system_message_to_human dihapus di langchain-google-genai 4.x
-    llm = ChatGoogleGenerativeAI(
-        model=_model,
-        google_api_key=_google_api_key,
-        temperature=0.2,
-    )
-
-    # ── Tool 1: Python REPL ───────────────────────────────────
-    python_repl = PythonREPLTool()
-    python_repl.description = (
-        "Eksekusi kode Python untuk analisis data dan visualisasi. "
-        "Data tersedia di: 'user_data.csv' (data upload user) ATAU "
-        "'ecommerce_cleaned.csv' (data demo bawaan). "
-        "Selalu cek file mana yang tersedia dengan os.path.exists(). "
-        "Kolom utama: order_id, product_category, Status Pesanan, "
-        "Waktu Pesanan Dibuat, Total Pembayaran, Provinsi, Metode Pembayaran. "
-        "Untuk membuat grafik: WAJIB akhiri kode dengan "
-        "plt.savefig('temp_plot.png', dpi=120, bbox_inches='tight'); plt.close() "
-        "agar grafik dapat ditampilkan di UI. "
-        "Gunakan matplotlib dengan style modern dan label dalam Bahasa Indonesia."
-    )
-
-    tools = [python_repl]
-
-    # ── Tool 2: Tavily Web Search (opsional) ─────────────────
-    if _tavily_api_key:
-        os.environ["TAVILY_API_KEY"] = _tavily_api_key
-        try:
-            # langchain-community masih bisa dipakai, tapi perlu tavily_api_key eksplisit
-            from langchain_community.tools.tavily_search import TavilySearchResults
-            with warnings.catch_warnings():
-                warnings.simplefilter("ignore")
-                web_search = TavilySearchResults(
-                    max_results=5,
-                    tavily_api_key=_tavily_api_key,
-                )
-            tools.append(web_search)
-        except Exception:
-            pass  # Tavily tidak tersedia, lanjut tanpa web search
-
-    # ── System Prompt untuk LangGraph ReAct ──────────────────
-    system_prompt = """Kamu adalah AI Analyst E-commerce Indonesia yang ahli, ramah, dan profesional.
-Kamu membantu pemilik bisnis UMKM menganalisis data penjualan dan mendapatkan insight bisnis yang actionable.
-
-=== ATURAN ROUTING TOOLS (WAJIB DIIKUTI) ===
-
-Gunakan Python_REPL HANYA untuk:
-- Analisis data INTERNAL dari file CSV (revenue, transaksi, dll)
-- Membuat grafik/chart dari data yang ada
-- Menghitung statistik: rata-rata, total, tren dari data
-- Pertanyaan mengandung: "berapa", "tampilkan data", "grafik", "chart", "analisis data", "produk terlaris dari data"
-
-Gunakan tavily_search_results_json untuk:
-- Strategi promosi, tips pemasaran, cara berjualan online
-- Riset harga kompetitor di marketplace (Shopee, Tokopedia, Lazada)
-- Tren pasar e-commerce terkini
-- Berita bisnis online, SEO, iklan digital, konten marketing
-- Pertanyaan mengandung: "strategi", "cara", "tips", "promosi", "marketing", "kompetitor", 
-  "harga pasar", "tren terkini", "Shopee", "Tokopedia", "Lazada"
-
-PENTING: Jika pertanyaan tentang STRATEGI atau CARA melakukan sesuatu
-→ LANGSUNG gunakan Web Search, JANGAN gunakan Python REPL!
-
-=== PANDUAN PYTHON REPL ===
-```python
-import pandas as pd
-import matplotlib.pyplot as plt
-import numpy as np
-import os
-
-# Cek file data
-data_file = 'user_data.csv' if os.path.exists('user_data.csv') else 'ecommerce_cleaned.csv'
-df = pd.read_csv(data_file)
-print(df.shape, df.columns.tolist())
-
-# ... analisis ...
-
-# WAJIB untuk grafik — simpan ke file agar tampil di UI
-plt.savefig('temp_plot.png', dpi=120, bbox_inches='tight')
-plt.close()
-print('Grafik berhasil dibuat')
-```
-
-=== PANDUAN JAWABAN FINAL ===
-- Gunakan Bahasa Indonesia yang jelas dan profesional
-- Format angka: Rp 1.234.567
-- Berikan minimal 3 rekomendasi actionable setelah setiap jawaban
-- Untuk jawaban Web Search: berikan sumber informasi dan konteks
-- Untuk jawaban data: jelaskan insight dari grafik yang dibuat"""
-
-    # ── Buat LangGraph ReAct Agent ───────────────────────────
-    # Signature: create_react_agent(model, tools, prompt=system_str, ...)
-    agent_graph = create_react_agent(
-        model=llm,
-        tools=tools,
-        prompt=system_prompt,
-    )
-
-    return agent_graph
 
 
 # ════════════════════════════════════════════════════════════
-#  GLOBAL ONBOARDING
+#  BAGIAN 5: ROUTING HALAMAN STREAMLIT
 # ════════════════════════════════════════════════════════════
-if "intro_completed" not in st.session_state:
-    st.session_state.intro_completed = False
-if "slide_index" not in st.session_state:
-    st.session_state.slide_index = 0
 
-if not st.session_state.intro_completed:
-    st.markdown("""<style>[data-testid="stSidebar"] {display: none;}</style>""", unsafe_allow_html=True)
-    
-    st.markdown(
-        """
-        <div class="welcome-header" style="margin-top: 2vh;">
-            <div class="welcome-sphere-container">
-                <div class="welcome-sphere-glow"></div>
-                <div class="welcome-sphere"></div>
-            </div>
-            <div class="welcome-title-small">SELAMAT DATANG DI</div>
-            <div class="welcome-title-main">E-commerce AI Analyst</div>
-        </div>
-        """, unsafe_allow_html=True
-    )
-    
-    if st.session_state.slide_index == 0:
-        st.markdown(
-            """
-            <div style="margin-top: 20px; margin-bottom: 20px; text-align: center;">
-                <h3 style="color: #f8fafc; font-weight: 600;">Yang Dapat Kami Lakukan</h3>
-                <p style="color: #94a3b8; font-size: 1.1rem; max-width: 600px; margin: 0 auto;">Aplikasi ini merubah cara Anda menganalisis data penjualan e-commerce secara otomatis.</p>
-            </div>
-            <div class="welcome-card-grid">
-                <div class="welcome-option-card">
-                    <div class="welcome-card-icon" style="background:none; box-shadow:none; font-size: 2.2rem; margin-bottom: 10px;">⚡</div>
-                    <div class="welcome-card-title">1. Automasi Analisis</div>
-                    <div class="welcome-card-desc">Data mentah langsung diolah secara otomatis menjadi laporan siap baca tanpa rumus rumit.</div>
-                </div>
-                <div class="welcome-option-card">
-                    <div class="welcome-card-icon" style="background:none; box-shadow:none; font-size: 2.2rem; margin-bottom: 10px;">🧠</div>
-                    <div class="welcome-card-title">2. Insight AI Cerdas</div>
-                    <div class="welcome-card-desc">AI menganalisis tren penjualan tersembunyi dan memberikan rekomendasi strategi yang konkrit.</div>
-                </div>
-                <div class="welcome-option-card">
-                    <div class="welcome-card-icon" style="background:none; box-shadow:none; font-size: 2.2rem; margin-bottom: 10px;">📊</div>
-                    <div class="welcome-card-title">3. Visualisasi Interaktif</div>
-                    <div class="welcome-card-desc">Ubah ratusan baris data transaksi menjadi grafik interaktif yang mudah dipahami.</div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True
-        )
-        st.markdown("<br>", unsafe_allow_html=True)
-        _, col_btn, _ = st.columns([2, 1, 2])
-        with col_btn:
-            if st.button("Selanjutnya", type="primary", use_container_width=True):
-                st.session_state.slide_index = 1
-                st.rerun()
-
-    elif st.session_state.slide_index == 1:
-        st.markdown(
-            """
-            <div style="margin-top: 20px; margin-bottom: 20px; text-align: center;">
-                <h3 style="color: #f8fafc; font-weight: 600;">Fitur Yang Dapat Digunakan</h3>
-                <p style="color: #94a3b8; font-size: 1.1rem; max-width: 600px; margin: 0 auto;">Tiga alat utama untuk mengoptimalkan operasional dan omzet bisnis Anda.</p>
-            </div>
-            <div class="welcome-card-grid">
-                <div class="welcome-option-card">
-                    <div class="welcome-card-icon" style="background:none; box-shadow:none; font-size: 2.2rem; margin-bottom: 10px;">📂</div>
-                    <div class="welcome-card-title">1. Upload Data</div>
-                    <div class="welcome-card-desc">Upload puluhan file laporan penjualan sekaligus. Sistem akan membersihkan dan menggabungkannya otomatis.</div>
-                </div>
-                <div class="welcome-option-card">
-                    <div class="welcome-card-icon" style="background:none; box-shadow:none; font-size: 2.2rem; margin-bottom: 10px;">📈</div>
-                    <div class="welcome-card-title">2. Dashboard Forecasting</div>
-                    <div class="welcome-card-desc">Lihat dasbor yang memetakan tren harian dan produk terlaris, serta memprediksi potensi omzet.</div>
-                </div>
-                <div class="welcome-option-card">
-                    <div class="welcome-card-icon" style="background:none; box-shadow:none; font-size: 2.2rem; margin-bottom: 10px;">🤖</div>
-                    <div class="welcome-card-title">3. Chatbot AI Agent</div>
-                    <div class="welcome-card-desc">Asisten virtual yang bisa riset web (mencari harga kompetitor online) dan memproses coding Python.</div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True
-        )
-        st.markdown("<br>", unsafe_allow_html=True)
-        col1, col2, col3, col4 = st.columns([1.5, 1, 1, 1.5])
-        with col2:
-            if st.button("Sebelumnya", use_container_width=True):
-                st.session_state.slide_index = 0
-                st.rerun()
-        with col3:
-            if st.button("Selanjutnya", type="primary", use_container_width=True):
-                st.session_state.slide_index = 2
-                st.rerun()
-
-    elif st.session_state.slide_index == 2:
-        st.markdown(
-            """
-            <div style="margin-top: 20px; margin-bottom: 20px; text-align: center;">
-                <h3 style="color: #f8fafc; font-weight: 600;">Langkah-Langkah Memulai</h3>
-                <p style="color: #94a3b8; font-size: 1.1rem; max-width: 600px; margin: 0 auto;">Cukup tiga langkah mudah untuk mengaktifkan asisten analitik pribadi Anda.</p>
-            </div>
-            <div class="welcome-card-grid">
-                <div class="welcome-option-card">
-                    <div class="welcome-card-icon" style="background:none; box-shadow:none; font-size: 2.2rem; margin-bottom: 10px;">1️⃣</div>
-                    <div class="welcome-card-title">Upload Data</div>
-                    <div class="welcome-card-desc">Unggah file ekspor pesanan mentah Anda ke dalam menu <b>Upload Data</b>.</div>
-                </div>
-                <div class="welcome-option-card">
-                    <div class="welcome-card-icon" style="background:none; box-shadow:none; font-size: 2.2rem; margin-bottom: 10px;">2️⃣</div>
-                    <div class="welcome-card-title">Lihat Insight Data</div>
-                    <div class="welcome-card-desc">Buka menu <b>Dashboard Forecasting</b> untuk melihat visualisasi grafik performa toko.</div>
-                </div>
-                <div class="welcome-option-card">
-                    <div class="welcome-card-icon" style="background:none; box-shadow:none; font-size: 2.2rem; margin-bottom: 10px;">3️⃣</div>
-                    <div class="welcome-card-title">Tanya Agent</div>
-                    <div class="welcome-card-desc">Buka menu <b>Chatbot AI Agent</b> dan bertanyalah apapun kepada AI tentang bisnis Anda.</div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True
-        )
-        st.markdown("<br>", unsafe_allow_html=True)
-        col1, col2, col3, col4 = st.columns([1.5, 1, 1, 1.5])
-        with col2:
-            if st.button("Sebelumnya", use_container_width=True):
-                st.session_state.slide_index = 1
-                st.rerun()
-        with col3:
-            if st.button("Tanya Sekarang", type="primary", use_container_width=True):
-                st.session_state.intro_completed = True
-                st.rerun()
-
-    st.stop()
-
-# ════════════════════════════════════════════════════════════
-#  SIDEBAR
-# ════════════════════════════════════════════════════════════
 with st.sidebar:
     st.markdown(
         """
-        <div class="sidebar-logo">
-            <div class="logo-icon"></div>
-            <span class="logo-text">E-commerce AI</span>
+        <div class="sidebar-brand">
+            <div class="brand-avatar">A</div>
+            <div>
+                <div class="brand-name">AI Analyst</div>
+                <div class="brand-role">E-commerce Intelligence</div>
+            </div>
         </div>
         """,
         unsafe_allow_html=True
     )
-    st.markdown("---")
+    st.markdown('<div class="sidebar-section-title">MENU UTAMA</div>', unsafe_allow_html=True)
+    menu_options = ["Upload Data", "Prediksi Penjualan", "Chatbot AI Agent", "Pengaturan"]
+    if "nav_menu" not in st.session_state:
+        st.session_state["nav_menu"] = "Upload Data"
+
+    current_idx = menu_options.index(st.session_state["nav_menu"]) if st.session_state["nav_menu"] in menu_options else 0
     halaman = st.radio(
-        "Navigasi",
-        ["Upload Data", "Dashboard Forecasting", "Chatbot AI Agent"],
+        "Menu Utama",
+        menu_options,
+        index=current_idx,
         label_visibility="collapsed"
     )
-    st.markdown("---")
-    st.caption("AI Agent Analitik E-commerce v3.0")
-
-
-# ════════════════════════════════════════════════════════════
-#  HALAMAN 1 : UPLOAD DATA
-# ════════════════════════════════════════════════════════════
-if halaman == "Upload Data":
-    st.title("Upload Data Transaksi")
-    st.info("Penjelasan Fitur: Di halaman ini Anda dapat mengunggah file laporan penjualan mentah (Excel/CSV) dari *Seller Centre* e-commerce Anda. Sistem kami akan secara cerdas membersihkan, memformat, dan menggabungkan data Anda sehingga siap untuk dianalisis oleh AI.", icon="💡")
-
-    with st.expander("Format file yang diterima"):
-        st.markdown("""
-**Format yang didukung:** `.xlsx`, `.xls`, `.csv`
-
-**Multi-file:** bisa upload beberapa bulan sekaligus, app akan
-menggabungkan dan mengurutkan otomatis.
-
-**App otomatis:**
-- Filter hanya status **Selesai**
-- Fix format angka ribuan
-- Deduplikasi multi-item order
-- Agregasi ke revenue harian
-        """)
-
-    # Upload multi-file: CSV dan XLSX
-    uploaded_files = st.file_uploader(
-        "Pilih file Shopee (Excel / CSV)",
-        type=["xlsx", "xls", "csv"],
-        accept_multiple_files=True,
-        help="Bisa pilih banyak file sekaligus dengan Ctrl+klik"
+    st.session_state["nav_menu"] = halaman
+    
+    st.markdown(
+        """
+        <div class="sidebar-footer">
+            <div class="status-badge"><span class="status-dot"></span> Sistem Aktif</div>
+            <div class="version-text">Versi 4.1 · Gemini Powered</div>
+        </div>
+        """,
+        unsafe_allow_html=True
     )
 
+# ── HALAMAN 1: UPLOAD DATA ────────────────────────────────────
+if halaman == "Upload Data":
+    st.markdown('<h1>Upload Data Transaksi</h1>', unsafe_allow_html=True)
+    st.markdown('<div class="header-desc">Unggah laporan pesanan toko (format Excel atau CSV) untuk memproses histori transaksi, mengekstrak tren penjualan, dan mengaktifkan AI Analyst.</div>', unsafe_allow_html=True)
+
+    col_upload, col_info = st.columns([1.5, 1], gap="large")
+    with col_upload:
+        uploaded_files = st.file_uploader(
+            "Pilih file laporan pesanan",
+            type=["xlsx", "xls", "csv"],
+            accept_multiple_files=True,
+            help="Mendukung file ekspor Seller Centre berformat .xlsx, .xls, dan .csv"
+        )
+    with col_info:
+        st.markdown(
+            (
+                '<div class="guide-card">'
+                '<div class="guide-title">Panduan Berkas</div>'
+                '<ul class="guide-list">'
+                '<li><strong>Format:</strong> CSV, XLSX, atau XLS hasil ekspor Seller Centre.</li>'
+                '<li><strong>Kolom Kunci:</strong> Waktu Pesanan Dibuat, Total Pembayaran, Status Pesanan.</li>'
+                '<li><strong>Pembersihan:</strong> Sistem otomatis menyaring pesanan selesai dan menangani multi-item order.</li>'
+                '</ul>'
+                '</div>'
+            ),
+            unsafe_allow_html=True
+        )
+
     if uploaded_files:
-        all_raw = []
-        failed  = []
-        with st.spinner(f"Membaca {len(uploaded_files)} file..."):
+        all_raw, failed = [], []
+        with st.spinner("Memproses file..."):
             for f in uploaded_files:
                 try:
                     df_raw = read_file(f)
-                    df_raw['_source_file'] = f.name
                     all_raw.append(df_raw)
                 except Exception as e:
                     failed.append(f"{f.name}: {e}")
-
-        if failed:
-            for msg in failed:
-                st.warning(f"Gagal baca: {msg}")
 
         if all_raw:
             df_combined = pd.concat(all_raw, ignore_index=True)
             df_clean    = clean_raw(df_combined)
 
-            if len(df_clean) == 0:
-                st.error(
-                    "Tidak ada transaksi 'Selesai' di file yang diupload. "
-                    "Pastikan kolom 'Status Pesanan' ada dan berisi data valid."
-                )
-            else:
+            if len(df_clean) > 0:
                 st.session_state['df_clean']   = df_clean
-                st.session_state['daily_hist'] = make_daily(df_clean)
-                st.session_state['uploaded_file_names'] = [f.name for f in uploaded_files]
+                st.session_state['weekly_hist'] = make_weekly(df_clean)
+                st.success(f"Berhasil memproses {len(df_clean):,} transaksi pesanan selesai.")
+            else:
+                st.error("Tidak ada transaksi berstatus 'Selesai' yang ditemukan.")
 
-                n_files = len(uploaded_files)
-                n_raw   = len(df_combined)
-                n_clean = len(df_clean)
-                daily   = st.session_state['daily_hist']
-                n_days  = len(daily)
+    if 'df_clean' in st.session_state:
+        df = st.session_state['df_clean']
+        weekly = st.session_state['weekly_hist']
 
-                st.success(
-                    f"{n_files} file berhasil diproses: "
-                    f"{n_raw:,} baris mentah → "
-                    f"{n_clean:,} transaksi Selesai → "
-                    f"{n_days} hari data"
+        h_insights = generate_historical_analyst_insights(df, weekly)
+
+        st.markdown("---")
+        k1, k2, k3, k4, k5 = st.columns(5)
+        k1.metric("Total Omzet", f"Rp {h_insights['total_revenue']:,.0f}")
+        k2.metric("Total Pesanan", f"{h_insights['total_orders']:,}")
+        k3.metric("Rata-rata Mingguan", f"Rp {h_insights['avg_weekly']:,.0f}")
+        k4.metric("Average Order Value", f"Rp {h_insights['aov']:,.0f}", help="Nilai transaksi rata-rata tiap pesanan pelanggan")
+        k5.metric("Puncak Penjualan", f"Rp {h_insights['peak_revenue']:,.0f}", delta=h_insights['peak_date_str'], delta_color="off")
+
+        st.subheader("Tren Penjualan Mingguan & Baseline")
+        import plotly.graph_objects as go
+        fig_trend = go.Figure()
+
+        # Area chart penjualan aktual
+        fig_trend.add_trace(go.Scatter(
+            x=weekly['order_week'],
+            y=weekly['total_revenue'],
+            mode='lines+markers',
+            name='Omzet Aktual',
+            line=dict(color='#0f172a', width=2.5),
+            fill='tozeroy',
+            fillcolor='rgba(15, 23, 42, 0.06)',
+            marker=dict(size=6, color='#0f172a'),
+            hovertemplate='<b>Minggu %{x|%d %b %Y}</b><br>Omzet: Rp %{y:,.0f}<extra></extra>'
+        ))
+
+        # Garis Baseline Rata-rata
+        fig_trend.add_trace(go.Scatter(
+            x=weekly['order_week'],
+            y=[h_insights['avg_weekly']] * len(weekly),
+            mode='lines',
+            name=f"Rata-rata (Rp {h_insights['avg_weekly']:,.0f})",
+            line=dict(color='#dc2626', width=1.5, dash='dot'),
+            hovertemplate=f"Rata-rata: Rp {h_insights['avg_weekly']:,.0f}<extra></extra>"
+        ))
+
+        # Anotasi Titik Puncak
+        if len(weekly) > 0 and h_insights['peak_revenue'] > 0:
+            peak_point_x = weekly.loc[weekly['total_revenue'].idxmax()]['order_week']
+            fig_trend.add_annotation(
+                x=peak_point_x,
+                y=h_insights['peak_revenue'],
+                text=f"Puncak: Rp {h_insights['peak_revenue']:,.0f}",
+                showarrow=True,
+                arrowhead=2,
+                arrowsize=1,
+                arrowwidth=1.5,
+                arrowcolor='#0284c7',
+                ax=0,
+                ay=-35,
+                bgcolor='#ffffff',
+                bordercolor='#0284c7',
+                borderwidth=1,
+                borderpad=4,
+                font=dict(family='Inter, sans-serif', size=11, color='#0f172a')
+            )
+
+        fig_trend.update_layout(
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            font_color='#475569',
+            font_family='Inter, sans-serif',
+            margin=dict(l=10, r=10, t=30, b=10),
+            xaxis=dict(gridcolor='#f1f5f9', title=None, tickformat='%d %b %Y'),
+            yaxis=dict(gridcolor='#f1f5f9', title=None, tickprefix='Rp ', tickformat=','),
+            legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1, bgcolor='rgba(0,0,0,0)')
+        )
+        st.plotly_chart(fig_trend, use_container_width=True)
+
+        # ── PANEL INSIGHT DATA ANALYST ──────────────────────────────
+        analyst_hist_html = (
+            f'<div class="analyst-box">'
+            f'<div class="analyst-badge">Data Analyst Business Insights & Diagnostics</div>'
+            f'<div class="analyst-heading">Diagnosa Kinerja & Pola Penjualan Historis</div>'
+            f'<div class="analyst-subheading">Interpretasi komprehensif terhadap dinamika transaksi toko, pembedahan faktor lonjakan omzet, dan rekomendasi aksi strategis.</div>'
+            f'<div class="analyst-grid">'
+            f'<div class="analyst-card">'
+            f'<div class="analyst-card-title">Dinamika Puncak Penjualan</div>'
+            f'<div class="analyst-card-value">{h_insights["peak_date_str"]}</div>'
+            f'<div class="analyst-card-desc">Omzet mencapai <strong>Rp {h_insights["peak_revenue"]:,.0f}</strong> ({h_insights["peak_above_avg"]:+.1f}% di atas rata-rata), menyumbang {h_insights["peak_share_pct"]:.1f}% dari keseluruhan omzet toko.</div>'
+            f'</div>'
+            f'<div class="analyst-card">'
+            f'<div class="analyst-card-title">Stabilitas & Konsentrasi Omzet</div>'
+            f'<div class="analyst-card-value">{h_insights["volatility_status"]}</div>'
+            f'<div class="analyst-card-desc">{h_insights["volatility_desc"]}</div>'
+            f'</div>'
+            f'<div class="analyst-card">'
+            f'<div class="analyst-card-title">Profil Transaksi & Pelanggan</div>'
+            f'<div class="analyst-card-value">AOV Rp {h_insights["aov"]:,.0f} · Hari Teramai: {h_insights["top_day_name"]}</div>'
+            f'<div class="analyst-card-desc">Hari {h_insights["top_day_name"]} menyumbang {h_insights["top_day_count"]} pesanan ({h_insights["top_day_pct"]:.1f}%). Ekspedisi utama: {h_insights["top_courier"]}.</div>'
+            f'</div>'
+            f'</div>'
+            f'<div class="analyst-section-title">1. Diagnosa Pola & Dinamika Lonjakan Omzet</div>'
+            f'<p class="analyst-p">{h_insights["narrative_diag"]}</p>'
+            f'<p class="analyst-p">{h_insights["narrative_drop"]}</p>'
+            f'<div class="analyst-section-title">2. Rekomendasi Aksi Strategis Bisnis Toko</div>'
+            f'<div class="strategy-card">'
+            f'<div class="strategy-title">Retensi Pembeli Pasca-Puncak (Post-Peak Retention)</div>'
+            f'<div class="strategy-body">{h_insights["rec_retention"]}</div>'
+            f'</div>'
+            f'<div class="strategy-card">'
+            f'<div class="strategy-title">Peningkatan Nilai Keranjang Belanja (AOV Enhancement & Bundling)</div>'
+            f'<div class="strategy-body">{h_insights["rec_bundling"]}</div>'
+            f'</div>'
+            f'<div class="strategy-card">'
+            f'<div class="strategy-title">Optimalisasi Hari Kampanye & Logistik (Timing & Channel Strategy)</div>'
+            f'<div class="strategy-body">{h_insights["rec_timing"]}</div>'
+            f'</div>'
+            f'</div>'
+        )
+        st.markdown(analyst_hist_html, unsafe_allow_html=True)
+
+        # Konsultasi AI Real-time Opsional jika API Key tersedia
+        google_api_key = str(st.session_state.get("google_api_key", "")).strip()
+        if google_api_key:
+            with st.expander("Konsultasi Tambahan dari Google Gemini AI", expanded=False):
+                st.caption("AI Gemini akan membaca ringkasan metrik data toko Anda secara langsung dan memberikan analisis kualitatif real-time.")
+                if st.button("Hasilkan Analisis AI Real-time", key="btn_ai_upload_insight"):
+                    with st.spinner("AI Gemini sedang menganalisis data toko Anda..."):
+                        try:
+                            from langchain_google_genai import ChatGoogleGenerativeAI
+                            curr_upload_model = st.session_state.get("gemini_model", "gemini-3.5-flash-lite")
+                            llm_direct = ChatGoogleGenerativeAI(
+                                model=curr_upload_model,
+                                google_api_key=google_api_key,
+                                temperature=0.2
+                            )
+                            ai_prompt = (
+                                f"Kamu adalah Senior E-commerce Data Analyst. Berikan evaluasi strategis bisnis yang ringkas, tajam, dan aplikatif berdasarkan metrik performa toko berikut:\n"
+                                f"- Total Omzet: Rp {h_insights['total_revenue']:,.0f}\n"
+                                f"- Total Transaksi Selesai: {h_insights['total_orders']:,} pesanan\n"
+                                f"- Nilai Keranjang Rata-rata (AOV): Rp {h_insights['aov']:,.0f}\n"
+                                f"- Rata-rata Mingguan: Rp {h_insights['avg_weekly']:,.0f}\n"
+                                f"- Minggu Puncak Penjualan: {h_insights['peak_date_str']} (Rp {h_insights['peak_revenue']:,.0f}, kontribusi {h_insights['peak_share_pct']:.1f}%)\n"
+                                f"- Hari Tersibuk: {h_insights['top_day_name']} ({h_insights['top_day_count']} pesanan)\n"
+                                f"- Produk Utama: {h_insights['top_prod_name']} ({h_insights['top_prod_share']:.1f}% omzet)\n"
+                                f"- Opsi Pengiriman Favorit: {h_insights['top_courier']}\n\n"
+                                f"Berikan 3 poin evaluasi profesional: 1) Diagnosa bottleneck atau peluang toko, 2) Taktik ekspansi omzet di hari biasa, 3) Rekomendasi aksi promosi."
+                            )
+                            ai_resp = llm_direct.invoke(ai_prompt)
+                            ai_text = _extract_text_content(ai_resp.content)
+                            st.markdown(
+                                f"""
+                                <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-left: 3.5px solid #0284c7; border-radius: 8px; padding: 16px 18px; margin-top: 12px;">
+                                    <div style="font-weight: 600; color: #0f172a; font-size: 0.92rem; margin-bottom: 8px;">Konsultasi Khusus AI Gemini ({curr_upload_model})</div>
+                                    <div style="font-size: 0.85rem; color: #334155; line-height: 1.65;">{ai_text}</div>
+                                </div>
+                                """,
+                                unsafe_allow_html=True
+                            )
+                        except Exception as ai_e:
+                            curr_upload_model = st.session_state.get("gemini_model", "gemini-3.5-flash-lite")
+                            diag = parse_ai_error_details(ai_e, curr_upload_model)
+                            render_error_diagnostics(diag)
+
+        # ── TABS PENDALAMAN DATA ────────────────────────────────────
+        st.markdown("<br>", unsafe_allow_html=True)
+        tab_day, tab_geo, tab_raw = st.tabs([
+            "Pola Hari Transaksi",
+            "Sebaran Wilayah & Logistik",
+            "Sampel Data Bersih"
+        ])
+
+        with tab_day:
+            col_t1, col_t2 = st.columns([1.8, 1])
+            with col_t1:
+                if 'Waktu Pesanan Dibuat' in df.columns:
+                    valid_dates = pd.to_datetime(df['Waktu Pesanan Dibuat'], errors='coerce').dropna()
+                    day_order = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu']
+                    day_map = {0: 'Senin', 1: 'Selasa', 2: 'Rabu', 3: 'Kamis', 4: 'Jumat', 5: 'Sabtu', 6: 'Minggu'}
+                    day_counts = valid_dates.dt.dayofweek.map(day_map).value_counts().reindex(day_order, fill_value=0).reset_index()
+                    day_counts.columns = ['Hari', 'Jumlah Pesanan']
+
+                    fig_day = px.bar(
+                        day_counts,
+                        x='Hari',
+                        y='Jumlah Pesanan',
+                        text='Jumlah Pesanan',
+                        color='Jumlah Pesanan',
+                        color_continuous_scale=['#cbd5e1', '#0284c7']
+                    )
+                    fig_day.update_traces(
+                        textposition='outside',
+                        hovertemplate='<b>%{x}</b>: %{y} pesanan<extra></extra>'
+                    )
+                    fig_day.update_layout(
+                        paper_bgcolor='rgba(0,0,0,0)',
+                        plot_bgcolor='rgba(0,0,0,0)',
+                        font_color='#475569',
+                        font_family='Inter, sans-serif',
+                        margin=dict(l=10, r=10, t=15, b=10),
+                        coloraxis_showscale=False,
+                        xaxis=dict(gridcolor='#f1f5f9', title=None),
+                        yaxis=dict(gridcolor='#f1f5f9', title=None)
+                    )
+                    st.plotly_chart(fig_day, use_container_width=True)
+                else:
+                    st.info("Informasi waktu transaksi tidak tersedia untuk analisis harian.")
+
+            with col_t2:
+                st.markdown(
+                    f"""
+                    <div style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:16px; margin-top:10px;">
+                        <div style="font-weight:600; font-size:0.88rem; color:#0f172a; margin-bottom:6px;">Insight Waktu Belanja</div>
+                        <div style="font-size:0.82rem; color:#475569; line-height:1.6;">
+                            Hari <strong>{h_insights['top_day_name']}</strong> merupakan hari paling produktif dengan <strong>{h_insights['top_day_count']} transaksi</strong> ({h_insights['top_day_pct']:.1f}% total pesanan).
+                            <br><br>
+                            <strong>Rekomendasi Operasional:</strong>
+                            <ul style="margin:6px 0 0 16px; padding:0;">
+                                <li>Jadwalkan peluncuran voucher toko pada awal pekan.</li>
+                                <li>Pastikan tim pengemasan dan ketersediaan stok siap optimal di hari {h_insights['top_day_name']}.</li>
+                            </ul>
+                        </div>
+                    </div>
+                    """,
+                    unsafe_allow_html=True
                 )
 
-    # Tampilkan data jika sudah ada
-    if 'df_clean' not in st.session_state:
-        st.info("Belum ada data. Upload file di atas untuk memulai.")
-        st.stop()
+        with tab_geo:
+            col_g1, col_g2 = st.columns(2)
+            with col_g1:
+                st.markdown("**Top 5 Provinsi Pembeli**")
+                if 'Provinsi' in df.columns:
+                    top_prov = df['Provinsi'].value_counts().head(5).reset_index()
+                    top_prov.columns = ['Provinsi', 'Jumlah Pesanan']
+                    fig_prov = px.bar(
+                        top_prov,
+                        y='Provinsi',
+                        x='Jumlah Pesanan',
+                        orientation='h',
+                        text='Jumlah Pesanan',
+                        color_discrete_sequence=['#0f172a']
+                    )
+                    fig_prov.update_traces(textposition='outside')
+                    fig_prov.update_layout(
+                        paper_bgcolor='rgba(0,0,0,0)',
+                        plot_bgcolor='rgba(0,0,0,0)',
+                        font_color='#475569',
+                        font_family='Inter, sans-serif',
+                        margin=dict(l=10, r=10, t=10, b=10),
+                        yaxis=dict(autorange='reversed', title=None),
+                        xaxis=dict(gridcolor='#f1f5f9', title=None)
+                    )
+                    st.plotly_chart(fig_prov, use_container_width=True)
+                else:
+                    st.info("Data provinsi tidak tersedia.")
 
-    df    = st.session_state['df_clean']
-    daily = st.session_state['daily_hist']
+            with col_g2:
+                st.markdown("**Opsi Pengiriman Terpopuler**")
+                if 'Opsi Pengiriman' in df.columns:
+                    top_ship = df['Opsi Pengiriman'].value_counts().head(5).reset_index()
+                    top_ship.columns = ['Opsi Pengiriman', 'Jumlah Pesanan']
+                    fig_ship = px.bar(
+                        top_ship,
+                        y='Opsi Pengiriman',
+                        x='Jumlah Pesanan',
+                        orientation='h',
+                        text='Jumlah Pesanan',
+                        color_discrete_sequence=['#0284c7']
+                    )
+                    fig_ship.update_traces(textposition='outside')
+                    fig_ship.update_layout(
+                        paper_bgcolor='rgba(0,0,0,0)',
+                        plot_bgcolor='rgba(0,0,0,0)',
+                        font_color='#475569',
+                        font_family='Inter, sans-serif',
+                        margin=dict(l=10, r=10, t=10, b=10),
+                        yaxis=dict(autorange='reversed', title=None),
+                        xaxis=dict(gridcolor='#f1f5f9', title=None)
+                    )
+                    st.plotly_chart(fig_ship, use_container_width=True)
+                else:
+                    st.info("Data opsi pengiriman tidak tersedia.")
 
-    # Metrik
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Total Transaksi",  f"{len(df):,}")
-    c2.metric("Total Revenue",    f"Rp {df['Total Pembayaran'].sum()/1e6:.1f}jt")
-    c3.metric("Produk Unik",
-              str(df['product_category'].nunique()) if 'product_category' in df.columns else "—")
-    c4.metric("Rentang Tanggal",
-              f"{daily['order_date'].min().strftime('%d %b %Y')} – "
-              f"{daily['order_date'].max().strftime('%d %b %Y')}")
+        with tab_raw:
+            st.dataframe(df.head(50), use_container_width=True, hide_index=True)
+            csv_data = df.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                "Unduh Data Bersih (.csv)",
+                data=csv_data,
+                file_name="data_penjualan_bersih.csv",
+                mime="text/csv"
+            )
 
-    # Preview
-    st.subheader("Preview Data")
-    cols_show = [c for c in ['order_id','product_category','Status Pesanan',
-                              'Waktu Pesanan Dibuat','Total Pembayaran',
-                              'Jumlah','Metode Pembayaran','Provinsi']
-                 if c in df.columns]
-    st.dataframe(df[cols_show].head(20), use_container_width=True)
+# ── HALAMAN 2: PREDIKSI PENJUALAN ──────────────────────────
+elif halaman == "Prediksi Penjualan":
+    st.markdown('<h1>Prediksi Penjualan Mingguan</h1>', unsafe_allow_html=True)
+    st.markdown('<div class="header-desc">Estimasi pendapatan toko untuk beberapa minggu ke depan guna membantu perencanaan stok barang, target omzet, dan strategi bisnis Anda.</div>', unsafe_allow_html=True)
 
-    # Tren revenue harian
-    st.subheader("Tren Revenue Harian")
-    fig = px.area(daily, x='order_date', y='total_revenue', 
-                  labels={'order_date': 'Tanggal', 'total_revenue': 'Revenue (IDR)'})
-    fig.update_traces(line_color='#00e5ff', fillcolor='rgba(0, 229, 255, 0.2)',
-                      hovertemplate='<b>Tanggal</b>: %{x|%d %b %Y}<br><b>Revenue</b>: Rp %{y:,.0f}<extra></extra>')
-    fig.update_layout(
-        paper_bgcolor='rgba(0,0,0,0)', 
-        plot_bgcolor='rgba(0,0,0,0)',
-        font_color='#94a3b8',
-        margin=dict(l=20, r=20, t=30, b=20),
-        xaxis=dict(showgrid=False),
-        yaxis=dict(showgrid=True, gridcolor='rgba(255,255,255,0.05)')
-    )
-    st.plotly_chart(fig, use_container_width=True)
-
-    # Top 10 produk
-    if 'product_category' in df.columns:
-        st.subheader("Top 10 Produk Terlaris (revenue)")
-        top = (df.groupby('product_category')['Total Pembayaran']
-               .sum().sort_values(ascending=True).tail(10).reset_index())
-        fig2 = px.bar(top, x='Total Pembayaran', y='product_category', orientation='h',
-                      labels={'Total Pembayaran': 'Total Revenue (IDR)', 'product_category': 'Kategori Produk'})
-        fig2.update_traces(marker_color='#facc15', 
-                           hovertemplate='<b>Kategori</b>: %{y}<br><b>Revenue</b>: Rp %{x:,.0f}<extra></extra>')
-        fig2.update_layout(
-            paper_bgcolor='rgba(0,0,0,0)', 
-            plot_bgcolor='rgba(0,0,0,0)',
-            font_color='#94a3b8',
-            margin=dict(l=20, r=20, t=30, b=20),
-            xaxis=dict(showgrid=True, gridcolor='rgba(255,255,255,0.05)'),
-            yaxis=dict(showgrid=False)
+    if 'weekly_hist' not in st.session_state:
+        st.markdown(
+            (
+                '<div class="guide-card" style="margin-top: 1rem;">'
+                '<div class="guide-title">Data Penjualan Belum Tersedia</div>'
+                '<p style="font-size: 0.9rem; color: #475569; margin-bottom: 12px; line-height: 1.6;">'
+                'Untuk melihat estimasi proyeksi penjualan toko Anda, sistem membutuhkan data transaksi sebelumnya.'
+                '</p>'
+                '<ul class="guide-list" style="margin-bottom: 8px;">'
+                '<li>Buka menu <strong>Upload Data</strong> di panel sebelah kiri.</li>'
+                '<li>Unggah berkas laporan pesanan toko (format Excel atau CSV).</li>'
+                '<li>Kembali ke menu ini untuk melihat grafik tren dan estimasi pendapatan mingguan.</li>'
+                '</ul>'
+                '</div>'
+            ),
+            unsafe_allow_html=True
         )
-        st.plotly_chart(fig2, use_container_width=True)
-
-
-# ════════════════════════════════════════════════════════════
-#  HALAMAN 2 : DASHBOARD FORECASTING
-# ════════════════════════════════════════════════════════════
-elif halaman == "Dashboard Forecasting":
-    st.title("Dashboard Forecasting")
-    st.info("**Penjelasan Fitur:**\nDi halaman ini Anda dapat melihat ringkasan performa penjualan Anda melalui grafik interaktif. Sistem juga menyajikan prediksi omzet (forecasting) untuk masa depan berdasarkan tren historis data penjualan Anda.", icon="💡")
-
-    if 'daily_hist' not in st.session_state:
-        st.warning("Upload data dulu di halaman **Upload Data**.")
         st.stop()
 
     try:
         model, scaler, meta = load_artifacts()
-    except FileNotFoundError as e:
-        st.error(f"File model tidak ditemukan: {e}")
-        st.info("Pastikan `model_xgb_tuned.pkl` dan `feature_columns.json` ada di folder project.")
+    except Exception:
+        st.error("Model machine learning mingguan belum ditemukan di direktori project.")
         st.stop()
 
-    daily_hist  = st.session_state['daily_hist']
-    n_days_hist = len(daily_hist)
-
-    if n_days_hist < 30:
-        st.error(
-            f"Data hanya {n_days_hist} hari. "
-            "Diperlukan minimal 30 hari agar lag_30 bisa dihitung. "
-            "Upload lebih banyak file."
-        )
+    weekly_hist = st.session_state['weekly_hist']
+    
+    # --- PERBAIKAN VALIDASI: Cukup 2 minggu data untuk memicu Prediksi ---
+    if len(weekly_hist) < 2:
+        st.error("Data transaksi terlalu sedikit. Diperlukan minimal 2 minggu data historis agar AI dapat melihat tren dasar.")
         st.stop()
+    elif len(weekly_hist) < 12:
+        st.warning("**Volume Data Terbatas:** Anda mengunggah data kurang dari 12 minggu (3 Bulan). AI tetap akan memproyeksikan penjualan berdasarkan tren jangka pendek Anda, namun akurasi untuk membaca pola musiman jangka panjang mungkin terbatas.")
 
-    # Info statistik data
-    nonzero   = daily_hist.loc[daily_hist['total_revenue']>0, 'total_revenue']
-    median_nz = float(nonzero.median()) if len(nonzero) > 0 else 0
-    pct_zero  = (daily_hist['total_revenue']==0).mean() * 100
-
-    st.info(
-        f"Histori: **{daily_hist['order_date'].min().strftime('%d %b %Y')}** "
-        f"s/d **{daily_hist['order_date'].max().strftime('%d %b %Y')}** "
-        f"({n_days_hist} hari) | "
-        f"Hari aktif: **{len(nonzero)}** | "
-        f"Median revenue/hari aktif: **Rp {median_nz/1e3:.0f}rb**"
-    )
-
-    # Warning jika banyak hari tutup (misal April = Lebaran)
-    if pct_zero > 20:
-        st.warning(
-            f"{pct_zero:.0f}% hari dalam data ini revenue = 0 (hari tutup/libur). "
-            f"Lag features di-impute dengan median Rp {median_nz/1e3:.0f}rb "
-            f"agar prediksi tetap realistis."
+    col_ctrl1, col_ctrl2 = st.columns([1, 2])
+    with col_ctrl1:
+        horizon = st.selectbox(
+            "Pilih Horizon Peramalan:",
+            [4, 8, 12],
+            format_func=lambda w: f"{w} Minggu ({w//4} Bulan ke depan)"
         )
 
-    # Kontrol horizon
-    st.sidebar.markdown("### Pengaturan Forecast")
-    horizon = st.sidebar.selectbox(
-        "Horizon prediksi",
-        [30, 60, 90],
-        format_func=lambda x: f"{x} hari ({x//30} bulan)"
-    )
+    with st.spinner("Menghitung proyeksi peramalan..."):
+        df_forecast = run_forecast_weekly(model, scaler, meta, weekly_hist, horizon)
 
-    # Jalankan forecast
-    with st.spinner(f"Menghitung prediksi {horizon} hari ke depan..."):
-        df_forecast = run_forecast(model, scaler, meta, daily_hist, horizon)
+    # Analisis Komprehensif Data Analyst
+    insights = generate_forecast_analyst_insights(weekly_hist, df_forecast, horizon)
 
-    # Metrik
-    total_pred = df_forecast['predicted_revenue'].sum()
-    avg_pred   = df_forecast['predicted_revenue'].mean()
-    max_val    = df_forecast['predicted_revenue'].max()
-    max_dt     = df_forecast.loc[df_forecast['predicted_revenue'].idxmax(), 'order_date']
-    avg_hist   = daily_hist[daily_hist['total_revenue']>0]['total_revenue'].mean()
-    delta_pct  = (avg_pred - avg_hist) / avg_hist * 100 if avg_hist > 0 else 0
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Total Prediksi Revenue", f"Rp {insights['total_pred']:,.0f}", help=f"Akumulasi proyeksi selama {horizon} minggu ke depan")
+    c2.metric("Rata-rata Mingguan", f"Rp {insights['avg_pred']:,.0f}", delta=f"{insights['growth_vs_recent_pct']:+.1f}% vs historis")
+    c3.metric("Estimasi Puncak", f"Rp {insights['peak_rev']:,.0f}", delta=insights['peak_dt_str'], delta_color="off")
+    c4.metric("Estimasi Terendah", f"Rp {insights['trough_rev']:,.0f}", delta=insights['trough_dt_str'], delta_color="off")
 
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Total Prediksi Revenue", f"Rp {total_pred:,.0f}",
-              help=f"Akumulasi {horizon} hari ke depan")
-    c2.metric("Rata-rata per Hari",
-              f"Rp {avg_pred:,.0f}",
-              delta=f"{delta_pct:+.1f}% vs historis")
-    c3.metric("Puncak Prediksi",
-              f"Rp {max_val:,.0f}",
-              help=f"Tanggal: {max_dt.strftime('%d %b %Y')}")
-
-    # Penjelasan sifat prediksi rolling forecast
-    pred_std  = df_forecast['predicted_revenue'].std()
-    pred_mean = df_forecast['predicted_revenue'].mean()
-    hist_std  = daily_hist[daily_hist['total_revenue']>0]['total_revenue'].std()
-
-    with st.expander("Cara membaca grafik prediksi ini", expanded=False):
-        st.markdown(f"""
-**Kenapa garis prediksi terlihat lebih stabil dari historis?**
-
-Ini adalah perilaku normal **rolling forecast** berbasis lag features:
-
-- Hari pertama prediksi menggunakan data aktual terakhir sebagai lag
-- Hari berikutnya, lag diisi dengan hasil prediksi sebelumnya
-- Akibatnya prediksi konverge ke nilai tengah (~Rp {pred_mean/1e3:.0f}rb/hari)
-- Variasi tersisa berasal dari pola mingguan (hari kerja vs weekend)
-
-**Std prediksi: Rp {pred_std/1e3:.0f}rb** vs **std historis: Rp {hist_std/1e3:.0f}rb**
-→ Model tidak bisa prediksi spike mendadak (harbolnas, viral) karena R²=0.13
-
-**Gunakan prediksi ini sebagai:** estimasi baseline revenue, bukan prediksi hari per hari yang presisi.
-        """)
-
-    # ── Grafik Gabungan Historis & Prediksi ──────────────
     import plotly.graph_objects as go
     fig_combined = go.Figure()
-
-    # Data Historis (Area Plot)
     fig_combined.add_trace(go.Scatter(
-        x=daily_hist['order_date'],
-        y=daily_hist['total_revenue'],
-        mode='lines',
-        fill='tozeroy',
-        name='Historis Aktual',
-        line=dict(color='#00E5FF', width=2),
-        fillcolor='rgba(0,229,255,0.12)',
-        hovertemplate='<b>%{x|%d %b %Y}</b><br>Revenue: Rp %{y:,.0f}<extra></extra>'
+        x=weekly_hist['order_week'],
+        y=weekly_hist['total_revenue'],
+        mode='lines+markers',
+        name='Aktual',
+        line=dict(color='#0f172a', width=2),
+        marker=dict(size=4, color='#0f172a'),
+        hovertemplate='<b>Aktual:</b> Rp %{y:,.0f}<extra></extra>'
     ))
-
-    # Menghubungkan titik akhir historis dengan titik awal prediksi
-    last_hist_date = daily_hist['order_date'].iloc[-1]
-    last_hist_rev = daily_hist['total_revenue'].iloc[-1]
-
-    range_dates = pd.concat([pd.Series([last_hist_date]), df_forecast['order_date']])
-    range_upper = pd.concat([pd.Series([last_hist_rev]), df_forecast['predicted_revenue'] * 1.42])
-    range_lower = pd.concat([pd.Series([last_hist_rev]), df_forecast['predicted_revenue'] * 0.58])
-
-    poly_x = pd.concat([range_dates, range_dates[::-1]])
-    poly_y = pd.concat([range_upper, range_lower[::-1]])
-
-    # Area rentang kemungkinan ±42% untuk prediksi
     fig_combined.add_trace(go.Scatter(
-        x=poly_x,
-        y=poly_y,
-        fill='toself',
-        fillcolor='rgba(255,215,0,0.12)',
-        line=dict(color='rgba(255,255,255,0)'),
-        name='Rentang Prediksi ±42% (MAPE)',
-        hoverinfo='skip',
+        x=df_forecast['order_week'],
+        y=df_forecast['predicted_revenue'],
+        mode='lines+markers',
+        name='Prediksi Model',
+        line=dict(color='#0284c7', width=2.5, dash='dash'),
+        marker=dict(size=5, color='#0284c7'),
+        hovertemplate='<b>Prediksi:</b> Rp %{y:,.0f}<extra></extra>'
     ))
-
-    # Prediksi Utama
-    pred_dates = pd.concat([pd.Series([last_hist_date]), df_forecast['order_date']])
-    pred_revs = pd.concat([pd.Series([last_hist_rev]), df_forecast['predicted_revenue']])
-
-    fig_combined.add_trace(go.Scatter(
-        x=pred_dates,
-        y=pred_revs,
-        mode='lines',
-        name='Prediksi Baseline',
-        line=dict(color='#FFD700', width=2.5, dash='dash'),
-        hovertemplate='<b>%{x|%d %b %Y}</b><br>Prediksi: Rp %{y:,.0f}<extra></extra>'
-    ))
-
-    # Garis rata-rata historis sebagai referensi
-    fig_combined.add_hline(
-        y=avg_hist,
-        line_dash='dot', line_color='rgba(255,255,255,0.4)', line_width=1.2,
-        annotation_text=f'Rata-rata historis: Rp {avg_hist/1e3:.0f}rb',
-        annotation_font_color='rgba(255,255,255,0.5)',
-        annotation_position='top left'
-    )
-
     fig_combined.update_layout(
-        title=f'Data Historis ({n_days_hist} hari) & Prediksi ({horizon} Hari ke Depan)',
-        title_font_size=16,
         paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(255,255,255,0.04)',
-        font_color='#e2e8f0',
-        margin=dict(l=10, r=10, t=45, b=10),
-        xaxis=dict(
-            gridcolor='rgba(255,255,255,0.06)',
-            tickformat='%d %b %Y',
-            title='Tanggal',
-        ),
-        yaxis=dict(
-            gridcolor='rgba(255,255,255,0.06)',
-            tickformat=',',
-            title='Revenue (IDR)',
-            tickprefix='Rp ',
-        ),
-        legend=dict(
-            orientation='h', yanchor='bottom', y=1.02,
-            xanchor='right', x=1,
-            bgcolor='rgba(0,0,0,0)',
-        ),
-        hovermode='x unified',
+        plot_bgcolor='rgba(0,0,0,0)',
+        font_color='#475569',
+        font_family='Inter, sans-serif',
+        margin=dict(l=10, r=10, t=30, b=10),
+        xaxis=dict(gridcolor='#f1f5f9', title=None, tickformat='%d %b %Y'),
+        yaxis=dict(gridcolor='#f1f5f9', title=None, tickprefix='Rp ', tickformat=','),
+        legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1, bgcolor='rgba(0,0,0,0)')
     )
-    
     st.plotly_chart(fig_combined, use_container_width=True)
 
-    # Ringkasan prediksi per minggu
-    st.subheader("Ringkasan Prediksi per Minggu")
-    df_forecast['minggu'] = df_forecast['order_date'].dt.to_period('W')
-    weekly = df_forecast.groupby('minggu').agg(
-        total=('predicted_revenue','sum'),
-        rata_rata=('predicted_revenue','mean'),
-        n_hari=('predicted_revenue','count')
-    ).reset_index()
-    weekly['Periode'] = weekly['minggu'].apply(
-        lambda w: f"{w.start_time.strftime('%d %b')} – {w.end_time.strftime('%d %b %Y')}")
-    weekly['Total Prediksi'] = weekly['total'].apply(lambda x: f"Rp {x:,.0f}")
-    weekly['Rata-rata/Hari'] = weekly['rata_rata'].apply(lambda x: f"Rp {x:,.0f}")
-    weekly['Hari'] = weekly['n_hari']
-    st.dataframe(weekly[['Periode','Hari','Rata-rata/Hari','Total Prediksi']],
-                 use_container_width=True, hide_index=True)
-
-    st.caption(
-        f"**Catatan penting:** Prediksi ini adalah estimasi baseline (rata-rata yang diharapkan). "
-        f"Revenue aktual bisa 42–58% lebih tinggi atau lebih rendah karena faktor tak terduga "
-        f"(event viral, promosi mendadak, harbolnas). "
+    # ── PANEL INSIGHT DATA ANALYST ──────────────────────────────
+    analyst_html = (
+        f'<div class="analyst-box">'
+        f'<div class="analyst-badge">Data Analyst Insight & Intelligence</div>'
+        f'<div class="analyst-heading">Analisis & Panduan Keputusan Bisnis</div>'
+        f'<div class="analyst-subheading">Interpretasi komprehensif terhadap pola proyeksi penjualan, perbandingan tren historis, dan panduan keputusan bisnis.</div>'
+        f'<div class="analyst-grid">'
+        f'<div class="analyst-card">'
+        f'<div class="analyst-card-title">Arah & Momentum Tren</div>'
+        f'<div class="analyst-card-value">{insights["trend_status"]}</div>'
+        f'<div class="analyst-card-desc">{insights["trend_summary"]}</div>'
+        f'</div>'
+        f'<div class="analyst-card">'
+        f'<div class="analyst-card-title">Jendela Puncak Penjualan</div>'
+        f'<div class="analyst-card-value">{insights["peak_dt_str"]}</div>'
+        f'<div class="analyst-card-desc">Estimasi omzet mencapai <strong>Rp {insights["peak_rev"]:,.0f}</strong> ({insights["peak_above_avg"]:+.1f}% di atas rata-rata).</div>'
+        f'</div>'
+        f'<div class="analyst-card">'
+        f'<div class="analyst-card-title">Stabilitas & Volatilitas</div>'
+        f'<div class="analyst-card-value">{insights["volatility_status"]}</div>'
+        f'<div class="analyst-card-desc">{insights["volatility_summary"]}</div>'
+        f'</div>'
+        f'</div>'
+        f'<div class="analyst-section-title">1. Diagnosa Pola & Dinamika Penjualan</div>'
+        f'<p class="analyst-p">{insights["narrative_diagnosis"]}</p>'
+        f'<p class="analyst-p">{insights["narrative_pattern"]}</p>'
+        f'<div class="analyst-section-title">2. Rekomendasi Aksi Strategis Toko</div>'
+        f'<div class="strategy-card">'
+        f'<div class="strategy-title">Rantai Pasok & Manajemen Inventaris</div>'
+        f'<div class="strategy-body">{insights["rec_inventory"]}</div>'
+        f'</div>'
+        f'<div class="strategy-card">'
+        f'<div class="strategy-title">Pemasaran & Kampanye Promosi</div>'
+        f'<div class="strategy-body">{insights["rec_marketing"]}</div>'
+        f'</div>'
+        f'<div class="strategy-card">'
+        f'<div class="strategy-title">Pengendalian Arus Kas & Keuangan</div>'
+        f'<div class="strategy-body">{insights["rec_cashflow"]}</div>'
+        f'</div>'
+        f'</div>'
     )
+    st.markdown(analyst_html, unsafe_allow_html=True)
 
-    # Tabel detail per hari
-    with st.expander("Lihat tabel prediksi detail per hari"):
-        df_show = df_forecast.copy()
-        df_show['Hari']            = df_show['order_date'].dt.strftime('%A')
-        df_show['Tanggal']         = df_show['order_date'].dt.strftime('%d %b %Y')
-        df_show['Prediksi Revenue'] = df_show['predicted_revenue'].apply(lambda x: f"Rp {x:,.0f}")
-        df_show['Batas Bawah']     = (df_show['predicted_revenue']*0.58).apply(lambda x: f"Rp {x:,.0f}")
-        df_show['Batas Atas']      = (df_show['predicted_revenue']*1.42).apply(lambda x: f"Rp {x:,.0f}")
-        st.dataframe(df_show[['Hari','Tanggal','Prediksi Revenue','Batas Bawah','Batas Atas']],
-                     use_container_width=True, hide_index=True)
+    with st.expander("Rincian Tabel Prediksi Mingguan"):
+        df_display = df_forecast.copy()
+        df_display['Periode Minggu'] = df_display['order_week'].dt.strftime('%d %b %Y')
+        df_display['Prediksi Pendapatan'] = df_display['predicted_revenue'].apply(lambda v: f"Rp {v:,.0f}")
+        st.dataframe(df_display[['Periode Minggu', 'Prediksi Pendapatan']], use_container_width=True, hide_index=True)
 
-
-# ════════════════════════════════════════════════════════════
-#  HALAMAN 3 : CHATBOT AI AGENT
-#  Arsitektur: LangChain ReAct (Reasoning + Acting)
-#  Tools: Python REPL + Tavily Web Search
-# ════════════════════════════════════════════════════════════
+# ── HALAMAN 3: CHATBOT AI AGENT (GEMINI) ─────────────────────────
 elif halaman == "Chatbot AI Agent":
-    st.title("Chatbot AI Agent")
-    st.info("**Penjelasan Fitur:**\nIni adalah asisten virtual pintar Anda. Anda bisa meminta AI untuk membuat grafik kustom, mencari harga kompetitor di internet, atau mendapatkan insight mendalam mengenai performa toko Anda. AI ini dilengkapi dengan arsitektur penalaran *ReAct* tingkat lanjut.", icon="💡")
+    # Inisialisasi state konfigurasi AI jika belum ada
+    if "google_api_key" not in st.session_state:
+        st.session_state["google_api_key"] = st.secrets.get("GOOGLE_API_KEY", "")
+    if "gemini_model" not in st.session_state:
+        st.session_state["gemini_model"] = "gemini-3.5-flash-lite"
 
-    # ── Cek API Keys ──────────────────────────────────────────
-    google_key = st.secrets.get("GOOGLE_API_KEY", "")
-    tavily_key = st.secrets.get("TAVILY_API_KEY", "")
-
-    # Tambahan: Opsi user input API Key sendiri & Tutorial
-    user_google_key = st.sidebar.text_input("Google API Key (opsional)", type="password", help="Gunakan API Key Anda sendiri jika ada.")
-    if user_google_key:
-        google_key = user_google_key
-
-    with st.sidebar.expander("Tutorial Mendapatkan API Key"):
-        st.markdown('''
-        **Cara mendapatkan Google Gemini API Key (GRATIS):**
-        1. Buka [Google AI Studio](https://aistudio.google.com/app/apikey)
-        2. Login dengan akun Google Anda.
-        3. Klik tombol **"Create API key"**.
-        4. Salin kuncinya dan paste di kolom input **Google API Key** di atas.
-        ''')
-
+    google_key = str(st.session_state.get("google_api_key", "")).strip()
     has_google = bool(google_key)
-    has_tavily = bool(tavily_key)
+    selected_model = st.session_state.get("gemini_model", "gemini-3.5-flash-lite")
+    model_options = [
+        "gemini-3.5-flash-lite",
+        "gemini-3.1-flash-lite",
+        "gemini-3.8-flash",
+        "gemini-3.5-flash"
+    ]
+    current_model_idx = model_options.index(selected_model) if selected_model in model_options else 0
 
-    if not has_google:
-        st.warning("**GOOGLE_API_KEY belum diset.** Tambahkan di `.streamlit/secrets.toml` atau masukkan di sidebar:")
-        st.code(
-            'GOOGLE_API_KEY = "YOUR_GOOGLE_API_KEY"  # wajib — https://aistudio.google.com/app/apikey (GRATIS)\n'
-            'TAVILY_API_KEY = "YOUR_TAVILY_API_KEY"  # opsional — https://tavily.com (GRATIS)',
-            language="toml"
+    col_hdr, col_top_reset = st.columns([3.6, 1.4], vertical_alignment="center")
+    with col_hdr:
+        st.markdown('<h1>AI Analyst Assistant</h1>', unsafe_allow_html=True)
+        st.markdown('<div class="header-desc">Konsultasikan performa penjualan toko atau lakukan riset harga pasar daring secara interaktif.</div>', unsafe_allow_html=True)
+    with col_top_reset:
+        if st.button("Mulai Obrolan Baru", use_container_width=True, help="Bersihkan riwayat obrolan dan mulai sesi baru"):
+            st.session_state.messages = []
+            st.session_state["last_ai_status"] = "ok"
+            _init_agent.clear()
+            st.rerun()
+
+    # Sidebar konfigurasi AI (Status informatif)
+    st.sidebar.markdown('<div class="sidebar-section-title">STATUS ENGINE AI</div>', unsafe_allow_html=True)
+    if has_google:
+        status_color = "#16a34a" if st.session_state.get("last_ai_status", "ok") == "ok" else "#dc2626"
+        status_bg = "#dcfce7" if st.session_state.get("last_ai_status", "ok") == "ok" else "#fee2e2"
+        status_text = "● Terkoneksi" if st.session_state.get("last_ai_status", "ok") == "ok" else "● Terkendala"
+        st.sidebar.markdown(
+            f"""
+            <div style="background-color: #f1f5f9; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 12px; margin-bottom: 8px;">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <span style="font-size: 0.76rem; font-weight: 600; color: #0f172a;">Gemini Engine</span>
+                    <span style="font-size: 0.68rem; color: {status_color}; font-weight: 600; background: {status_bg}; padding: 2px 7px; border-radius: 999px;">{status_text}</span>
+                </div>
+                <div style="font-size: 0.72rem; color: #64748b; margin-top: 4px;">Model: <b style="color: #0f172a;">{selected_model}</b></div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+        if st.sidebar.button("Reset Percakapan", use_container_width=True, key="btn_sidebar_reset"):
+            st.session_state.messages = []
+            st.session_state["last_ai_status"] = "ok"
+            _init_agent.clear()
+            st.rerun()
+    else:
+        st.sidebar.markdown(
+            """
+            <div style="background-color: #fffbeb; border: 1px solid #fef3c7; border-radius: 8px; padding: 8px 12px; margin-bottom: 8px;">
+                <div style="display: flex; align-items: center; justify-content: space-between;">
+                    <span style="font-size: 0.76rem; font-weight: 600; color: #92400e;">Gemini Engine</span>
+                    <span style="font-size: 0.68rem; color: #d97706; font-weight: 600; background: #fef3c7; padding: 2px 7px; border-radius: 999px;">● Belum Diset</span>
+                </div>
+                <div style="font-size: 0.72rem; color: #b45309; margin-top: 4px;">Atur di menu Pengaturan</div>
+            </div>
+            """,
+            unsafe_allow_html=True
         )
 
-    # ── Model selector (tampil hanya jika API key ada) ────────────
-    GEMINI_MODELS = {
-        "gemini-3.1-flash-lite"   : "Gemini 3.1 Flash Lite",
-        "gemini-2.5-flash"   : "Gemini 2.5 Flash",
-        "gemini-1.5-flash"   : "Gemini 1.5 Flash",
-        "gemini-1.5-flash-8b": "Gemini 1.5 Flash 8B",
-        "gemini-2.0-flash"   : "Gemini 2.0 Flash",
-    }
-    selected_model = st.sidebar.selectbox(
-        "Model Gemini",
-        options=list(GEMINI_MODELS.keys()),
-        format_func=lambda m: GEMINI_MODELS[m],
-        help="Pilih model AI Anda."
-    ) if has_google else "gemini-3.1-flash"
+    # Banner info jika API Key belum diset
+    if not has_google:
+        col_warn, col_to_setting = st.columns([3.2, 1], vertical_alignment="center")
+        with col_warn:
+            st.warning("**Google API Key belum diset.** Buka halaman **Pengaturan** untuk memasukkan API Key agar asisten AI dapat memproses analisis data Anda.")
+        with col_to_setting:
+            if st.button("Buka Pengaturan", use_container_width=True, type="primary"):
+                st.session_state["nav_menu"] = "Pengaturan"
+                st.rerun()
 
-    # ── Siapkan data untuk agent ──────────────────────────────
-    data_file_path   = "ecommerce_cleaned.csv"   # default: data demo
-    data_source_info = "`ecommerce_cleaned.csv`"
-
+    # Save Data for Agent
+    data_file_path = "ecommerce_cleaned.csv"
     if 'df_clean' in st.session_state and st.session_state['df_clean'] is not None:
         try:
             st.session_state['df_clean'].to_csv('user_data.csv', index=False)
-            data_file_path   = "user_data.csv"
-            # Tampilkan nama file asli yang diupload user
-            file_names = st.session_state.get('uploaded_file_names', ['user_data.csv'])
-            file_list = ', '.join(f'`{fn}`' for fn in file_names)
-            data_source_info = f"Data upload Anda: {file_list}"
-        except Exception as e:
-            st.warning(f"Gagal menyimpan data upload ke CSV: {e}")
+            data_file_path = "user_data.csv"
+        except Exception:
+            pass
 
-    st.info(f"**Sumber data aktif:** {data_source_info}")
-    
-    st.markdown("**Tips:** Jika agent error, klik **Reset Agent** di bawah chat.")
-
-    # ── Contoh pertanyaan ─────────────────────────────────────
-    with st.expander("Contoh pertanyaan yang bisa kamu tanya", expanded=False):
-        col_ex1, col_ex2 = st.columns(2)
-        with col_ex1:
-            st.markdown("""
-**Analisis Data :**
-- *Tampilkan grafik revenue per bulan*
-- *Produk apa yang paling laris? Buat chart*
-- *Analisis penjualan berdasarkan provinsi*
-- *Berapa rata-rata nilai transaksi per hari?*
-- *Tren penjualan 3 bulan terakhir bagaimana?*
-            """)
-        with col_ex2:
-            st.markdown("""
-**Riset Pasar :**
-- *Cari harga produk fashion wanita di Shopee*
-- *Tren produk elektronik terlaris Tokopedia 2025*
-- *Strategi promosi e-commerce yang efektif*
-- *Kompetitor produk kecantikan di marketplace*
-            """)
-
-    st.divider()
-
-    # ── Chat history init ─────────────────────────────────────
-    if "messages" not in st.session_state:
-        # Resolve the clean model name
-        clean_model_name = GEMINI_MODELS.get(selected_model, selected_model)
+    # Inisialisasi Riwayat Percakapan
+    if "messages" not in st.session_state or not st.session_state.messages or "scraping harga" in st.session_state.messages[0].get("content", ""):
         st.session_state.messages = [{
             "role": "assistant",
-            "content": (
-                "Halo! Saya **AI Agent Analitik E-commerce**\n\n"
-                "**Kemampuan saya:**\n"
-                "- Analisis data, buat grafik otomatis, hitung statistik\n"
-                "- Riset harga kompetitor Shopee/Tokopedia, tren pasar\n\n"
-                "Silakan tanya apa saja!"
-            )
+            "content": "Halo, saya AI Analyst toko Anda. Saya siap membantu memeriksa ringkasan transaksi toko, menganalisis produk terlaris, pola omzet mingguan, ataupun mencari harga pasar kompetitor di internet."
         }]
 
-    # ── Render chat history ───────────────────────────────────
-    for i, msg in enumerate(st.session_state.messages):
+    # Ide pertanyaan awal sederhana jika percakapan masih baru
+    preset_chosen = None
+    if len(st.session_state.messages) <= 1:
+        st.markdown(
+            """
+            <div style="font-size: 0.82rem; font-weight: 600; color: #475569; margin-bottom: 8px;">
+                Ide Pertanyaan Awal yang Dapat Dicoba:
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+        col_q1, col_q2, col_q3, col_q4 = st.columns(4)
+        with col_q1:
+            if st.button("Total Penjualan", use_container_width=True, help="Ringkasan omzet dan transaksi toko"):
+                preset_chosen = "Berapa total penjualan dan jumlah transaksi yang sudah berhasil di toko saya?"
+        with col_q2:
+            if st.button("5 Produk Terlaris", use_container_width=True, help="Daftar produk dengan penjualan terbanyak"):
+                preset_chosen = "Sebutkan 5 produk yang paling laris dan berapa kontribusinya terhadap omzet toko."
+        with col_q3:
+            if st.button("Hari Belanja Teramai", use_container_width=True, help="Hari dengan volume pesanan tertinggi"):
+                preset_chosen = "Di hari apa toko saya menerima pesanan paling banyak dan bagaimana sarannya?"
+        with col_q4:
+            if st.button("Cek Harga Pasar", use_container_width=True, help="Riset harga pembanding di marketplace"):
+                preset_chosen = "Cari kisaran harga pasaran celengan atau produk sejenis di Shopee dan Tokopedia."
+
+    # Tampilkan percakapan
+    for msg in st.session_state.messages:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
             if "image_bytes" in msg:
                 st.image(msg["image_bytes"], use_container_width=True)
 
-    # ── Chat input ────────────────────────────────────────────
-    prompt_user = st.chat_input(
-        "Tanya tentang data penjualan atau riset kompetitor..." if has_google
-        else "Tambahkan GOOGLE_API_KEY untuk menggunakan chatbot"
-    )
+    # Input pengguna
+    prompt_user = st.chat_input("Ketik pertanyaan Anda...")
+    active_prompt = preset_chosen if preset_chosen else prompt_user
 
-    if prompt_user:
-        # Tampilkan pesan user
-        st.session_state.messages.append({"role": "user", "content": prompt_user})
+    if active_prompt:
+        st.session_state.messages.append({"role": "user", "content": active_prompt})
         with st.chat_message("user"):
-            st.markdown(prompt_user)
+            st.markdown(active_prompt)
 
-        # Proses jawaban
         with st.chat_message("assistant"):
-
-            # ── Mode demo (tanpa API key) ─────────────────────
             if not has_google:
-                resp = _demo_response(prompt_user)
+                resp = _demo_response(active_prompt)
                 st.markdown(resp)
                 st.session_state.messages.append({"role": "assistant", "content": resp})
-
-            # ── Mode penuh (dengan API key) ───────────────────
             else:
-                # Inisialisasi agent (cached)
+                agent_exec = None
                 try:
-                    agent_exec = _init_agent(
-                        _google_api_key=google_key,
-                        _tavily_api_key=tavily_key if has_tavily else "",
-                        _model=selected_model
-                    )
+                    agent_exec = _init_agent(_google_api_key=google_key, _model=selected_model)
                 except Exception as init_err:
-                    err_msg = (
-                        f"Gagal menginisialisasi AI Agent: `{init_err}`\n\n"
-                        "**Kemungkinan penyebab:**\n"
-                        "- GOOGLE_API_KEY tidak valid atau expired\n"
-                        "- Paket LangChain belum terinstall lengkap\n\n"
-                        "Coba jalankan: `pip install -r requirements.txt`"
-                    )
-                    st.error(err_msg)
-                    st.session_state.messages.append({"role": "assistant", "content": err_msg})
+                    st.session_state["last_ai_status"] = "error"
+                    diag = parse_ai_error_details(init_err, selected_model)
+                    render_error_diagnostics(diag)
+                    if st.button("Ubah Model di Pengaturan", key="btn_goto_sett_init"):
+                        st.session_state["nav_menu"] = "Pengaturan"
+                        st.rerun()
                     st.stop()
 
-                # ── Smart routing: deteksi tipe pertanyaan ─────────────────
-                # Hindari agent salah pakai Python REPL untuk pertanyaan strategi
-                q_lower = prompt_user.lower()
-
-                # Keyword pertanyaan EKSTERNAL (butuh Web Search)
-                WEB_SEARCH_KEYWORDS = [
-                    "strategi", "cara ", "tips ", "promosi", "marketing",
-                    "pemasaran", "kompetitor", "harga pasar", "tren terkini",
-                    "shopee", "tokopedia", "lazada", "blibli", "marketplace",
-                    "digital", "seo", "iklan", "konten", "media sosial",
-                    "sosmed", "viral", "endorse", "influencer", "diskon efektif",
-                    "cara berjualan", "cara meningkatkan", "bagaimana cara",
-                    "apa yang harus", "rekomendasi toko", "harga kompetitor"
-                ]
-
-                # Keyword pertanyaan INTERNAL (butuh Python REPL / analisis data)
-                DATA_KEYWORDS = [
-                    "grafik", "chart", "plot", "visualisasi", "tampilkan data",
-                    "berapa total", "berapa rata", "hitung", "statistik",
-                    "dari data", "analisis data", "terlaris dari", "transaksi",
-                    "revenue", "pendapatan", "omzet dari data"
-                ]
-
-                is_web_question  = any(kw in q_lower for kw in WEB_SEARCH_KEYWORDS)
-                is_data_question = any(kw in q_lower for kw in DATA_KEYWORDS)
-
-                # Tentukan routing hint
-                if is_web_question and not is_data_question:
-                    routing_hint = (
-                        "[ROUTING HINT: Pertanyaan ini adalah tentang pengetahuan EKSTERNAL. "
-                        "WAJIB gunakan tavily_search_results_json (Web Search) untuk menjawab. "
-                        "JANGAN gunakan Python_REPL untuk pertanyaan ini.]"
-                    )
-                elif is_data_question and not is_web_question:
-                    routing_hint = (
-                        "[ROUTING HINT: Pertanyaan ini membutuhkan analisis data INTERNAL. "
-                        "Gunakan Python_REPL untuk membaca dan menganalisis file CSV.]"
-                    )
-                else:
-                    routing_hint = (
-                        "[ROUTING HINT: Tentukan sendiri tool yang paling tepat berdasarkan "
-                        "aturan routing di system prompt.]"
-                    )
-
-                # ── Susun history percakapan sebelumnya sebagai teks ──
-                history_text = ""
-                if len(st.session_state.messages) > 2: # Jika ada chat selain welcome message
-                    history_text = "=== RIWAYAT PERCAKAPAN (KONTEKS) ===\n"
-                    # Skip welcome msg (idx 0) dan prompt saat ini (terakhir)
-                    for past_msg in st.session_state.messages[1:-1]:
-                        role_name = "User" if past_msg["role"] == "user" else "AI"
-                        # Batasi panjang history agar tidak over-token
-                        msg_snippet = str(past_msg["content"]).strip()[:800]
-                        if msg_snippet:
-                            history_text += f"{role_name}: {msg_snippet}\n"
-                    history_text += "====================================\n\n"
-
-                # Susun input untuk agent — sertakan history + info data + routing hint
                 agent_input = (
-                    f"{history_text}"
-                    f"{routing_hint}\n\n"
-                    f"Konteks Data:\n"
-                    f"- File data tersedia: '{data_file_path}' ({data_source_info})\n"
-                    f"- Untuk load data: pd.read_csv('{data_file_path}')\n"
-                    f"- Untuk grafik: simpan ke 'temp_plot.png'\n\n"
-                    f"Pertanyaan user saat ini: {prompt_user}"
+                    f"Data transaksi toko tersimpan pada berkas: '{data_file_path}'.\n"
+                    f"Pertanyaan Pemilik Toko: {active_prompt}\n\n"
+                    f"PANDUAN KOMUNIKASI: Jangan pernah menyebutkan nama berkas fisik teknis ('{data_file_path}' atau lainnya) di dalam teks jawaban. "
+                    f"Sebut selalu sebagai 'Data Penjualan Toko Anda' atau 'Laporan Transaksi Toko'."
                 )
 
-                # Jalankan LangGraph ReAct agent
                 try:
-                    with st.spinner("Agent sedang berpikir (ReAct: Reasoning → Action → Observation)..."):
-                        # LangGraph invoke format yang benar & aman:
-                        result = agent_exec.invoke(
-                            {"messages": [("human", agent_input)]}
-                        )
-
-                    # LangGraph result: dict dengan key "messages" berisi list pesan
-                    # Pesan terakhir adalah jawaban final dari AI
-                    all_msgs = result.get("messages", [])
-                    answer = "Maaf, tidak dapat menghasilkan jawaban."
-                    if all_msgs:
-                        last_msg = all_msgs[-1]
-                        content = getattr(last_msg, "content", str(last_msg))
-                        # Terkadang Gemini mengembalikan list of dict blocks
-                        if isinstance(content, list):
-                            texts = [blk.get("text", "") for blk in content if isinstance(blk, dict) and "text" in blk]
-                            answer = "\n".join(texts) if texts else str(content)
-                        else:
-                            answer = str(content)
+                    with st.status("AI Analyst sedang menganalisis...", expanded=True) as status_box:
+                        st.write("1. Mengidentifikasi kebutuhan analisis bisnis...")
                         
-                        # Fallback jika model menolak menjawab (misal karena safety filter atau function call gagal)
-                        if not answer.strip():
-                            # Cek raw response metadata jika ada
-                            raw_meta = getattr(last_msg, "response_metadata", {})
-                            finish_reason = raw_meta.get("finish_reason", "UNKNOWN")
+                        is_market_query = any(k in active_prompt.lower() for k in ["harga", "pasar", "kompetitor", "pesaing", "shopee", "tokopedia", "riset", "luar", "online"])
+                        if is_market_query:
+                            st.write("2. Menghimpun data pembanding harga produk dari marketplace daring...")
+                        else:
+                            st.write("2. Membaca dan membedah ringkasan data transaksi toko...")
                             
-                            if finish_reason == "MALFORMED_FUNCTION_CALL":
-                                # AUTO-RETRY: Coba langsung tanpa tools (direct LLM call)
-                                st.toast("MALFORMED_FUNCTION_CALL terdeteksi, mencoba mode langsung...", icon="🤖")
-                                try:
-                                    from langchain_google_genai import ChatGoogleGenerativeAI
-                                    from langchain_core.messages import SystemMessage, HumanMessage
-                                    direct_llm = ChatGoogleGenerativeAI(
-                                        model=selected_model,
-                                        google_api_key=google_key,
-                                        temperature=0.3,
-                                    )
-                                    fallback_resp = direct_llm.invoke([
-                                        SystemMessage(content=(
-                                            "Kamu adalah AI Analyst E-commerce Indonesia. "
-                                            "Jawab pertanyaan user secara informatif dalam Bahasa Indonesia. "
-                                            "Jika pertanyaan butuh data CSV, beritahu user bahwa mode tool sedang bermasalah "
-                                            "dan sarankan ganti model ke Gemini 1.5 Flash di sidebar."
-                                        )),
-                                        HumanMessage(content=prompt_user)
-                                    ])
-                                    fb_content = getattr(fallback_resp, "content", "")
-                                    if isinstance(fb_content, list):
-                                        fb_content = " ".join(b.get("text","") for b in fb_content if isinstance(b,dict))
-                                    answer = (
-                                        f"{fb_content}\n\n"
-                                        "---\n"
-                                        "Mode terbatas: Analisis data/grafik tidak tersedia karena MALFORMED_FUNCTION_CALL pada model ini. "
-                                        f"Untuk analisis penuh, ganti model ke **Gemini 1.5 Flash** di sidebar."
-                                    )
-                                except Exception:
-                                    answer = (
-                                        f"Error: {finish_reason}\n\n"
-                                        f"Model `{selected_model}` (Gemini 2.5 Flash) kadang mengalami bug function-call "
-                                        f"saat dipasangkan dengan LangGraph.\n\n"
-                                        "**Solusi cepat:** Ganti model ke **Gemini 1.5 Flash** di sidebar → klik **Reset Agent** → tanya lagi."
-                                    )
-                            else:
-                                answer = (
-                                    "**Agent mengembalikan teks kosong.**\n\n"
-                                    f"Alasan penghentian (Finish Reason): `{finish_reason}`\n\n"
-                                    "Coba sederhanakan pertanyaan atau ganti model di sidebar."
-                                )
+                        result = agent_exec.invoke({"messages": [("human", agent_input)]})
+                        
+                        st.write("3. Merumuskan wawasan bisnis dan rekomendasi keputusan...")
+                        status_box.update(label="Analisis Selesai", state="complete", expanded=False)
+                    
+                    all_msgs = result.get("messages", [])
+                    raw_content = getattr(all_msgs[-1], "content", "") if all_msgs else "Tidak ada respons yang dihasilkan."
+                    answer = _extract_text_content(raw_content)
 
-                    # ── Tampilkan reasoning steps dari messages (DISEMBUNYIKAN) ───
-                    pass
-
-                    # ── Cek & tampilkan grafik ─────────────────
                     image_bytes = None
                     if os.path.exists("temp_plot.png"):
                         with open("temp_plot.png", "rb") as imgf:
                             image_bytes = imgf.read()
                         st.image(image_bytes, use_container_width=True)
-                        try:
-                            os.remove("temp_plot.png")
-                        except Exception:
-                            pass
+                        os.remove("temp_plot.png")
 
-                    # ── Tampilkan jawaban final ────────────────
                     st.markdown(answer)
-
-                    # ── Simpan ke history ──────────────────────
+                    st.session_state["last_ai_status"] = "ok"
+                    
                     msg_entry = {"role": "assistant", "content": answer}
                     if image_bytes:
                         msg_entry["image_bytes"] = image_bytes
                     st.session_state.messages.append(msg_entry)
 
-                except Exception as run_err:
-                    err_detail = str(run_err)
+                except Exception as e:
+                    st.session_state["last_ai_status"] = "error"
+                    diag = parse_ai_error_details(e, selected_model)
+                    render_error_diagnostics(diag)
+                    col_act1, _ = st.columns([1.5, 2.5])
+                    with col_act1:
+                        if st.button("Pilih Model Lain di Pengaturan", key="btn_switch_model_err"):
+                            st.session_state["nav_menu"] = "Pengaturan"
+                            st.rerun()
 
-                    # ── Deteksi error 429 RESOURCE_EXHAUSTED (quota habis) ────
-                    if "429" in err_detail or "RESOURCE_EXHAUSTED" in err_detail or "quota" in err_detail.lower():
-                         err_msg = (
-                             "**Quota API Gemini Habis (429 RESOURCE_EXHAUSTED)**\n\n"
-                             f"Model `{selected_model}` sudah mencapai batas free tier.\n\n"
-                             "**Solusi (pilih salah satu):**\n"
-                             "1. Tunggu beberapa menit lalu coba lagi (rate limit per menit)\n"
-                             "2. 🤖 Ganti model di **sidebar kiri** ke `gemini-1.5-flash` atau `gemini-1.5-flash-8b`\n"
-                             "3. Upgrade ke [Google AI Studio Pro](https://aistudio.google.com) untuk limit lebih tinggi\n\n"
-                             "Setelah ganti model, klik **Reset Agent** lalu kirim pertanyaan lagi."
-                         )
-                         st.warning(err_msg)
-                    else:
-                         err_msg = (
-                             f"**Error saat menjalankan agent:**\n\n`{err_detail[:300]}`\n\n"
-                             "**Solusi:**\n"
-                             "1. Klik tombol **Reset Agent** di bawah\n"
-                             "2. Coba sederhanakan pertanyaan\n"
-                             "3. Ganti model di sidebar jika error berulang"
-                         )
-                         st.error(err_msg)
+# ── HALAMAN 4: PENGATURAN SISTEM & AI ─────────────────────────────
+elif halaman == "Pengaturan":
+    st.markdown('<h1>Pengaturan Sistem & Kredensial AI</h1>', unsafe_allow_html=True)
+    st.markdown('<div class="header-desc">Kelola konfigurasi API Key Google Gemini, preferensi model kecerdasan buatan, dan parameter integrasi sistem toko Anda.</div>', unsafe_allow_html=True)
 
-                    st.session_state.messages.append({
-                        "role": "assistant",
-                        "content": err_msg
-                    })
-                    # Reset cache agar agent dapat diinisialisasi ulang dengan model baru
-                    _init_agent.clear()
+    if "google_api_key" not in st.session_state:
+        st.session_state["google_api_key"] = st.secrets.get("GOOGLE_API_KEY", "")
+    if "gemini_model" not in st.session_state:
+        st.session_state["gemini_model"] = "gemini-3.5-flash-lite"
 
-    # ── Tombol aksi ───────────────────────────────────────────
-    st.divider()
-    col_btn1, col_btn2, _ = st.columns([1, 1, 2])
-    with col_btn1:
-        if st.button("Bersihkan Chat", use_container_width=True):
-            st.session_state.messages = []
-            st.rerun()
-    with col_btn2:
-        if st.button("Reset Agent", use_container_width=True):
-            _init_agent.clear()
-            st.success("Agent cache direset. Kirim pertanyaan untuk inisialisasi ulang.")
+    col_form, col_info = st.columns([1.6, 1], gap="large")
+
+    with col_form:
+        st.markdown("### Kredensial Google Gemini")
+        st.caption("Kunci API ini menjadi mesin pemikir utama untuk membedah data transaksi internal UMKM dan melakukan riset kompetitor di web.")
+        
+        current_api_key = st.session_state.get("google_api_key", "")
+        input_api_key = st.text_input(
+            "Google API Key",
+            type="password",
+            value=current_api_key,
+            placeholder="Tempel Google API Key Anda di sini...",
+            help="Dapatkan kunci API gratis di Google AI Studio (aistudio.google.com)."
+        )
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("### Preferensi Model AI")
+        st.caption("Pilih model LLM Google Gemini yang digunakan oleh ReAct Agent (disesuaikan dengan alokasi kuota gratis Google AI Studio):")
+
+        model_list = [
+            "gemini-3.5-flash-lite",
+            "gemini-3.1-flash-lite",
+            "gemini-3.8-flash",
+            "gemini-3.5-flash"
+        ]
+        model_desc = {
+            "gemini-3.5-flash-lite": "**Gemini 3.5 Flash Lite (Direkomendasikan)** — Kuota gratis tertinggi: 500 permintaan/hari (RPD) & 15 RPM. Kecepatan respon kilat, sangat hemat kuota, dan optimal untuk analisis data toko serta eksekusi Python REPL.",
+            "gemini-3.1-flash-lite": "**Gemini 3.1 Flash Lite** — Kuota gratis 500 permintaan/hari (RPD) & 15 RPM. Opsi alternatif stabil berkecepatan tinggi dengan alokasi harian besar.",
+            "gemini-3.8-flash": "**Gemini 3.8 Flash** — Kuota gratis 20 permintaan/hari (RPD) & 5 RPM. Model generasi terkini dengan kemampuan penalaran logika mendalam untuk evaluasi strategi e-commerce lanjutan.",
+            "gemini-3.5-flash": "**Gemini 3.5 Flash** — Kuota gratis 20 permintaan/hari (RPD) & 5 RPM. Keseimbangan solid antara kapasitas penalaran analitis dan kecepatan inferensi."
+        }
+
+        current_selected = st.session_state.get("gemini_model", "gemini-3.5-flash-lite")
+        sel_idx = model_list.index(current_selected) if current_selected in model_list else 0
+        input_model = st.selectbox(
+            "Pilih Varian Model",
+            model_list,
+            index=sel_idx
+        )
+        st.info(model_desc.get(input_model, ""))
+
+        # Uji koneksi interaktif
+        st.markdown("<br>", unsafe_allow_html=True)
+        col_save, col_test, col_del, col_chat = st.columns([1.2, 1.2, 1, 1.2])
+        
+        with col_save:
+            if st.button("Simpan Pengaturan", type="primary", use_container_width=True):
+                st.session_state["google_api_key"] = input_api_key.strip()
+                st.session_state["gemini_model"] = input_model
+                st.session_state["last_ai_status"] = "ok"
+                _init_agent.clear()
+                st.success("Pengaturan berhasil disimpan dan langsung aktif.")
+                st.rerun()
+
+        with col_test:
+            if st.button("Uji Koneksi", use_container_width=True):
+                test_key = input_api_key.strip()
+                if not test_key:
+                    st.warning("Masukkan Google API Key terlebih dahulu untuk melakukan pengujian.")
+                else:
+                    with st.spinner(f"Menguji koneksi ke {input_model}..."):
+                        try:
+                            from langchain_google_genai import ChatGoogleGenerativeAI
+                            test_llm = ChatGoogleGenerativeAI(
+                                model=input_model,
+                                google_api_key=test_key,
+                                temperature=0.1
+                            )
+                            test_res = test_llm.invoke("Halo, verifikasi koneksi sistem e-commerce.")
+                            st.session_state["last_ai_status"] = "ok"
+                            st.success(f"Koneksi Berhasil! Model '{input_model}' aktif dan siap digunakan.")
+                        except Exception as test_e:
+                            st.session_state["last_ai_status"] = "error"
+                            diag = parse_ai_error_details(test_e, input_model)
+                            render_error_diagnostics(diag)
+
+        with col_del:
+            if st.button("Hapus Kunci", use_container_width=True):
+                st.session_state["google_api_key"] = ""
+                st.session_state["last_ai_status"] = "ok"
+                _init_agent.clear()
+                st.warning("Kunci API telah dihapus.")
+                st.rerun()
+
+        with col_chat:
+            if st.button("Ke Chatbot AI", use_container_width=True):
+                st.session_state["nav_menu"] = "Chatbot AI Agent"
+                st.rerun()
+
+    with col_info:
+        st.markdown("### Status Integrasi")
+        has_key_saved = bool(st.session_state.get("google_api_key", "").strip())
+        active_m = st.session_state.get('gemini_model', 'gemini-3.5-flash-lite')
+        
+        # Kuota info
+        quota_info = "500 Permintaan / Hari (15 RPM)" if "lite" in active_m else "20 Permintaan / Hari (5 RPM)"
+        
+        if has_key_saved:
+            st.markdown(
+                f"""
+                <div style="background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 14px 16px; margin-bottom: 16px;">
+                    <div style="font-size: 0.85rem; font-weight: 600; color: #15803d;">Sistem AI Terhubung</div>
+                    <div style="font-size: 0.78rem; color: #166534; margin-top: 4px;">Kunci API terdeteksi dan terhubung ke engine Google Gemini.</div>
+                    <div style="font-size: 0.74rem; color: #4b5563; margin-top: 8px;">Model Aktif: <code style="background: #e2e8f0; padding: 1px 5px; border-radius: 4px;">{active_m}</code></div>
+                    <div style="font-size: 0.74rem; color: #15803d; margin-top: 4px; font-weight: 600;">Alokasi Kuota: {quota_info}</div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+        else:
+            st.markdown(
+                """
+                <div style="background-color: #fffbeb; border: 1px solid #fde68a; border-radius: 10px; padding: 14px 16px; margin-bottom: 16px;">
+                    <div style="font-size: 0.85rem; font-weight: 600; color: #b45309;">Kunci Belum Terpasang</div>
+                    <div style="font-size: 0.78rem; color: #92400e; margin-top: 4px;">Masukkan Google API Key Anda untuk mengaktifkan seluruh fitur Chatbot AI Agent.</div>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+        st.markdown("### Ringkasan Kuota Gratis Model (Google AI)")
+        st.markdown(
+            """
+            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 14px; font-size: 0.76rem; color: #334155; line-height: 1.55; margin-bottom: 16px;">
+                <table style="width: 100%; border-collapse: collapse;">
+                    <tr style="border-bottom: 1px solid #e2e8f0; font-weight: 600;">
+                        <th style="text-align: left; padding: 4px 0;">Model</th>
+                        <th style="text-align: center; padding: 4px 0;">RPM</th>
+                        <th style="text-align: right; padding: 4px 0;">RPD (Harian)</th>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #f1f5f9; background: #f0fdf4;">
+                        <td style="padding: 5px 0; font-weight: 600; color: #166534;">3.5 Flash Lite</td>
+                        <td style="text-align: center; color: #166534;">15</td>
+                        <td style="text-align: right; font-weight: 600; color: #166534;">500 RPD</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #f1f5f9;">
+                        <td style="padding: 5px 0;">3.1 Flash Lite</td>
+                        <td style="text-align: center;">15</td>
+                        <td style="text-align: right; font-weight: 600;">500 RPD</td>
+                    </tr>
+                    <tr style="border-bottom: 1px solid #f1f5f9;">
+                        <td style="padding: 5px 0;">3.8 Flash</td>
+                        <td style="text-align: center;">5</td>
+                        <td style="text-align: right;">20 RPD</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 5px 0;">3.5 Flash</td>
+                        <td style="text-align: center;">5</td>
+                        <td style="text-align: right;">20 RPD</td>
+                    </tr>
+                </table>
+                <div style="font-size: 0.70rem; color: #64748b; margin-top: 8px;">
+                    *RPD = Requests Per Day (Permintaan per Hari). RPM = Requests Per Minute.
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+        st.markdown("### Panduan Mendapatkan Kunci")
+        st.markdown(
+            """
+            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 16px; font-size: 0.82rem; line-height: 1.6; color: #475569;">
+                1. Buka situs <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color: #0284c7; font-weight: 600;">Google AI Studio</a>.<br>
+                2. Masuk menggunakan akun Google Anda.<br>
+                3. Klik tombol <b>"Create API Key"</b>.<br>
+                4. Salin kode API Key yang muncul.<br>
+                5. Tempelkan ke kolom form sebelah kiri dan klik <b>Simpan Pengaturan</b>.
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
+        st.markdown("### Keamanan dan Privasi Sesi")
+        st.markdown(
+            """
+            <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 14px; font-size: 0.78rem; color: #64748b; line-height: 1.5;">
+                Kunci API yang Anda masukkan hanya disimpan pada memori sesi peramban Anda (Streamlit Session State) dan tidak pernah dibagikan atau dipublikasikan.
+            </div>
+            """,
+            unsafe_allow_html=True
+        )

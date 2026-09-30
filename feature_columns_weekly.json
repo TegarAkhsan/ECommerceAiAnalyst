@@ -1,0 +1,39 @@
+{
+  "features": [
+    "year",
+    "month",
+    "week_of_year",
+    "quarter",
+    "is_holiday_gap",
+    "lag_1",
+    "lag_4",
+    "lag_12",
+    "rolling_4w_mean",
+    "rolling_12w_mean",
+    "is_ramadan",
+    "is_harbolnas",
+    "sin_month",
+    "cos_month",
+    "sin_year",
+    "cos_year",
+    "week_index",
+    "dominant_category_Baskom / Mangkok Besar",
+    "dominant_category_Celengan",
+    "dominant_category_Lunch Box / Rantang",
+    "dominant_category_Mangkok Sambal / Saus",
+    "dominant_category_Nampan / Tray",
+    "dominant_category_Seal / Baut / Roof"
+  ],
+  "scale_cols": [
+    "lag_1",
+    "lag_4",
+    "lag_12",
+    "rolling_4w_mean",
+    "rolling_12w_mean",
+    "week_index",
+    "sin_month",
+    "cos_month",
+    "sin_year",
+    "cos_year"
+  ]
+}

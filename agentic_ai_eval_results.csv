@@ -1,0 +1,347 @@
+id,query,execution_success,tool_selection_correct,tools_used,final_answer,latency_sec,error,provenance_validity,unsupported_estimate,numerical_correctness
+Q01,Berapa total revenue minggu lalu?,True,True,"['Python_REPL', 'Python_REPL', 'Python_REPL', 'Python_REPL', 'Python_REPL']","Berdasarkan hasil analisis dari **Laporan Transaksi Toko Anda**, berikut adalah rincian total pendapatan (revenue) untuk minggu terakhir yang tercatat dalam data (periode 24 April 2024 hingga 30 April 2024):
+
+* **Total Pendapatan (Revenue):** **Rp 10.660.691**
+
+Semua pesanan dalam periode tersebut tercatat dengan status **Selesai**. Jika Anda memerlukan analisis lebih mendalam atau perbandingan dengan minggu-minggu sebelumnya, silakan sampaikan!",15.23,,,,
+Q02,Tampilkan tren revenue 4 minggu terakhir,True,True,"['Python_REPL', 'Python_REPL', 'Python_REPL', 'Python_REPL', 'Python_REPL']","Berdasarkan **Laporan Transaksi Toko**, berikut adalah analisis dan visualisasi tren pendapatan (*revenue*) selama 4 minggu terakhir:
+
+### 📊 Ringkasan Tren Pendapatan 4 Minggu Terakhir
+1. **Minggu 1 (08 Apr 2024 - 14 Apr 2024):** Rp 5.598.283
+2. **Minggu 2 (15 Apr 2024 - 21 Apr 2024):** Rp 11.999.989 *(Puncak pendapatan tertinggi pada periode ini)*
+3. **Minggu 3 (22 Apr 2024 - 28 Apr 2024):** Rp 11.014.033 *(Stabil di angka belasan juta rupiah)*
+4. **Minggu 4 (29 Apr 2024 - 05 Mei 2024):** Rp 2.923.217 *(Mengalami penyesuaian/penurunan di akhir periode)*
+
+---
+
+### 📈 Grafik Visualisasi Tren Pendapatan
+*(Grafik tren mingguan di bawah ini telah disiapkan untuk memberikan gambaran visual pergerakan omzet toko Anda)*
+
+![Grafik Tren Pendapatan](temp_plot.png)
+
+### 💡 Catatan & Rekomendasi Bisnis:
+* **Lonjakan Signifikan:** Toko Anda mengalami performa penjualan yang sangat kuat pada pertengahan April (Minggu ke-2 dan ke-3) dengan omzet menembus angka di atas Rp 11 juta per minggu. Ini momentum yang sangat baik untuk dianalisis (apakah karena kampanye promo tertentu, flash sale, atau tren produk).
+* **Evaluasi Penurunan:** Pada minggu terakhir (29 Apr - 05 Mei), terlihat adanya penurunan omzet. Anda dapat memeriksa kembali ketersediaan stok produk terlaris (*best-seller*) atau merancang strategi promosi baru untuk mendongkrak kembali transaksi di minggu berikutnya.",21.21,,,,
+Q03,Produk apa yang paling laris bulan ini?,True,True,"['Python_REPL', 'Python_REPL', 'Python_REPL']","Berdasarkan analisis terhadap **Laporan Transaksi Toko** untuk bulan terakhir (April 2024), berikut adalah daftar kategori produk yang paling laris dan diminati oleh pelanggan:
+
+1. **Celengan** – **374 unit** (Produk terlaris peringkat pertama, mendominasi total penjualan bulan ini).
+2. **Nampan / Tray** – **234 unit**.
+3. **Mangkok Sambal / Saus** – **208 unit**.
+4. **Other (Lainnya)** – **48 unit**.
+5. **Perlengkapan Packing** – **45 unit**.
+
+### 💡 Catatan & Rekomendasi Bisnis untuk Anda:
+* **Fokus Stok & Promosi:** Kategori **Celengan** mencatat performa yang sangat menonjol dibandingkan produk lainnya. Pastikan ketersediaan stok (inventaris) untuk produk celengan tetap aman agar tidak kehabisan momen penjualan (potensi *lost sales*).
+* **Cross-Selling:** Produk pendukung seperti **Nampan/Tray** dan **Mangkok Sambal/Saos** juga memiliki volume penjualan yang tinggi. Anda bisa mempertimbangkan untuk membuat paket bundling (paket hemat) antara produk-produk terlaris ini untuk mendongkrak rata-rata nilai transaksi per pelanggan (*Average Order Value*).",15.84,,,,
+Q04,Berapa rata-rata nilai transaksi (AOV) di toko saya?,True,True,"['Python_REPL', 'Python_REPL', 'Python_REPL']","Berdasarkan analisis terhadap **Laporan Transaksi Toko** Anda, berikut adalah rincian mengenai rata-rata nilai transaksi (*Average Order Value* / AOV):
+
+* **Rata-rata Nilai Transaksi (AOV):** **Rp 52.887** per pesanan
+* **Total Jumlah Pesanan Unik:** 402 pesanan
+
+**Analisis Singkat:**
+Nilai AOV sebesar ~Rp 52,8 ribu menunjukkan bahwa sebagian besar pelanggan Anda melakukan pembelian dalam nominal tersebut per transaksi. Untuk meningkatkan omzet toko ke depan, Anda dapat mencoba strategi *bundling* produk (menggabungkan beberapa produk sekaligus) atau menawarkan minimal belanja tertentu untuk mendapatkan gratis ongkir agar pelanggan terdorong menambah jumlah produk dalam satu keranjang belanja. 
+
+Ada hal lain seputar performa penjualan atau produk Anda yang ingin dianalisis lebih lanjut?",41.3,,,,
+Q05,Berapa jumlah pesanan yang dibatalkan oleh pembeli dan apa alasan utamanya?,True,True,"['Python_REPL', 'Python_REPL', 'Python_REPL']","Berdasarkan analisis menyeluruh terhadap **Laporan Transaksi Toko Anda**, berikut adalah rincian mengenai pesanan yang dibatalkan:
+
+* **Jumlah Pesanan Dibatalkan:** **0 pesanan** (dari total 534 transaksi tercatat, seluruhnya berstatus ""Selesai"").
+* **Alasan Utama Pembatalan:** Tidak ada, karena **tidak ada satu pun pesanan yang mengalami pembatalan** oleh pembeli pada periode data tersebut.
+
+Seluruh transaksi yang masuk pada laporan toko Anda berhasil diselesaikan dengan baik tanpa adanya kendala pembatalan. Ini menunjukkan performa pelayanan dan kepuasan pelanggan yang sangat prima! 
+
+Jika Anda ingin menganalisis aspek lain seperti tren produk terlaris atau performa pengiriman, silakan beri tahu saya ya.",8.57,,,,
+Q06,Di hari apa toko saya menerima volume pesanan paling banyak?,True,True,['Python_REPL'],"Berdasarkan analisis terhadap Laporan Transaksi Toko Anda, berikut adalah rincian volume pesanan berdasarkan hari dalam seminggu:
+
+* **Senin:** 119 pesanan
+* **Rabu:** 83 pesanan
+* **Kamis:** 81 pesanan
+* **Jumat:** 69 pesanan
+* **Sabtu:** 67 pesanan
+* **Minggu:** 58 pesanan
+* **Selasa:** 57 pesanan
+
+**Hari dengan volume pesanan paling banyak adalah hari Senin** dengan total 119 pesanan. 
+
+### Rekomendasi Bisnis untuk Anda:
+1. **Persiapan Stok & Logistik:** Pastikan stok produk andalan Anda sudah terisi penuh menjelang akhir pekan agar Anda siap menghadapi lonjakan pesanan yang masuk di awal minggu (terutama hari Senin).
+2. **Jadwal Kampanye & Promosi:** Manfaatkan momentum tingginya trafik di hari Senin ini dengan menjadwalkan peluncuran produk baru atau diskon khusus agar tingkat konversi penjualan semakin optimal.",4.68,,,,
+Q07,Metode pembayaran apa yang paling populer digunakan oleh pelanggan?,True,True,['Python_REPL'],"Berdasarkan analisis terhadap Laporan Transaksi Toko Anda, berikut adalah rincian metode pembayaran yang paling populer digunakan oleh pelanggan:
+
+1. **COD (Bayar di Tempat)** — **243 transaksi** (Paling populer / Juara 1)
+2. **Saldo ShopeePay** — **133 transaksi**
+3. **Online Payment** — **75 transaksi**
+4. **SPayLater** — **55 transaksi**
+5. **SeaBank Bayar Instan** — **15 transaksi**
+6. **Kartu Kredit/Debit** — **13 transaksi**
+
+### **Wawasan Bisnis untuk Toko Anda:**
+* **Dominasi Pembayaran Tunai/COD:** Metode **COD (Bayar di Tempat)** menjadi pilihan utama pelanggan Anda dengan selisih yang cukup signifikan dibanding metode lainnya. Ini menunjukkan bahwa sebagian besar pembeli di toko Anda masih mengandalkan rasa aman dan fleksibilitas membayar secara tunai saat barang sampai.
+* **Adopsi Dompet Digital & *PayLater*:** Kombinasi antara **Saldo ShopeePay**, **SPayLater**, dan **Online Payment** menunjukkan bahwa pelanggan digital (non-tunai) juga memiliki porsi yang cukup kuat. 
+
+**Rekomendasi:** Pastikan kerja sama Anda dengan mitra logistik yang menyediakan layanan COD tetap terjaga dengan baik untuk menjaga kenyamanan mayoritas pelanggan Anda. Selain itu, Anda bisa terus memaksimalkan promo gratis ongkir atau diskon khusus untuk metode pembayaran digital guna mendorong efisiensi pencairan dana penjualan toko.",4.37,,,,
+Q08,Sebutkan 3 kota atau kabupaten dengan kontribusi omzet terbesar,True,True,"['Python_REPL', 'Python_REPL', 'Python_REPL']","Berdasarkan hasil analisis terhadap **Laporan Transaksi Toko Anda**, berikut adalah 3 kota atau kabupaten dengan kontribusi omzet (total pembayaran) terbesar:
+
+1. **Kota Jakarta Timur** — Total Omzet: **Rp 3.094.577**
+2. **Kota Jakarta Utara** — Total Omzet: **Rp 2.425.574**
+3. **Kota Tangerang Selatan** — Total Omzet: **Rp 2.358.672**
+
+Wilayah-wilayah tersebut merupakan pusat kontributor penjualan tertinggi untuk toko Anda saat ini.",8.32,,,,
+Q09,Berapa total akumulasi ongkos kirim yang dibayarkan oleh pembeli?,True,True,"['Python_REPL', 'Python_REPL']","Berdasarkan analisis pada Laporan Transaksi Toko Anda, total akumulasi ongkos kirim yang dibayarkan oleh pembeli adalah sebesar **5.727,40** (sesuai satuan mata uang yang tercatat pada sistem pencatatan transaksi toko). 
+
+Jika Anda memerlukan analisis lebih mendalam mengenai tren pengiriman, kurir favorit, atau proporsi ongkos kirim terhadap nilai transaksi keseluruhan, silakan beri tahu saya!",10.68,,,,
+Q10,Buatkan visualisasi grafik batang penjualan berdasarkan kategori produk,True,True,"['Python_REPL', 'Python_REPL', 'Python_REPL', 'Python_REPL']","Berdasarkan **Laporan Transaksi Toko**, Sistem Analitik Data Toko telah memproses rekapitulasi penjualan dan menyusun visualisasi grafik batang untuk 10 kategori produk dengan kontribusi pendapatan tertinggi.
+
+Berikut adalah visualisasi grafik penjualan berdasarkan kategori produk:
+
+![Grafik Penjualan Berdasarkan Kategori Produk](temp_plot.png)
+
+### **Ringkasan Analisis Kategori Produk:**
+1. **Kategori Unggulan (Top Contributor):** Kategori **Celengan** mencatatkan kontribusi omzet tertinggi secara signifikan, mencapai **Rp 13,8 juta**, jauh memimpin dibandingkan kategori lainnya.
+2. **Kategori Pendukung Utama:** 
+   - **Mangkok Sambal / Saus** berada di posisi kedua dengan perolehan sekitar **Rp 5,8 juta**.
+   - **Perlengkapan Packing** (Rp 2,4 juta) dan **Nampan / Tray** (Rp 2,3 juta) turut menjadi pendorong utama kestabilan omzet toko Anda.
+3. **Peluang Optimasi:** Kategori lain seperti **Toples**, **Lunch Box**, dan **Rak Serbaguna** memiliki potensi untuk ditingkatkan melalui strategi promosi bundling atau pemberian diskon khusus pada periode mendatang guna mendongkrak performa penjualan secara merata.",16.2,,,,
+Q11,Prediksi revenue minggu depan,True,True,['forecast_tool'],"Berdasarkan model peramalan tren penjualan dari Laporan Transaksi Toko Anda, berikut adalah proyeksi pendapatan untuk minggu depan:
+
+* **Proyeksi Omzet Minggu Depan** (Pekan yang berakhir pada 12 Mei 2024): **Rp 7.149.988**
+
+Proyeksi ini dihitung berdasarkan pola historis transaksi dan tren mingguan toko Anda. Pastikan stok produk andalan Anda mencukupi dan pertimbangkan untuk menyiapkan promo atau kampanye khusus menjelang akhir pekan guna memaksimalkan potensi pencapaian omzet tersebut! 
+
+Jika Anda ingin melihat proyeksi untuk beberapa minggu ke depan atau memerlukan analisis performa produk terlaris, silakan beri tahu saya.",11.08,,,,
+Q12,Perkirakan omzet toko untuk 4 minggu ke depan,True,True,['forecast_tool'],"Berikut adalah hasil peramalan atau proyeksi omzet untuk **4 minggu ke depan** berdasarkan analisis pola tren historis dari Laporan Transaksi Toko Anda:
+
+### 📈 Proyeksi Omzet Mingguan
+1. **Pekan ke-1** (Berakhir 12 Mei 2024): **Rp 7.149.988**
+2. **Pekan ke-2** (Berakhir 19 Mei 2024): **Rp 8.269.568**
+3. **Pekan ke-3** (Berakhir 26 Mei 2024): **Rp 8.205.777**
+4. **Pekan ke-4** (Berakhir 2 Juni 2024): **Rp 7.541.644**
+
+---
+
+### 💡 Rangkuman & Rekomendasi Bisnis
+* **Total Proyeksi Omzet (4 Minggu):** Rp 31.166.976
+* **Rata-rata Omzet Per Minggu:** Rp 7.791.744
+* **Analisis Tren:** 
+  * Omzet Anda diproyeksikan mengalami kenaikan yang cukup solid pada dua minggu pertama, mencapai puncaknya di kisaran Rp 8,2 juta pada pekan kedua dan ketiga.
+  * Menjelang awal Juni, terlihat sedikit penyesuaian/stabilisasi omzet.
+
+**Saran Tindakan (Action Plan):**
+* **Persiapan Stok:** Pastikan ketersediaan produk terlaris (*bestseller*) Anda mencukupi untuk mengantisipasi lonjakan permintaan di pekan ke-2 dan ke-3.
+* **Strategi Promosi:** Manfaatkan momentum kenaikan omzet ini dengan menjalankan promo bundling atau diskon khusus di pertengahan periode agar nilai keranjang belanja (*average order value*) meningkat. 
+
+Ada hal lain atau analisis spesifik terkait produk yang ingin Anda ketahui?",3.45,,,,
+Q13,Berapa proyeksi penjualan toko pada bulan depan?,True,True,['forecast_tool'],"Berikut adalah proyeksi atau peramalan omzet penjualan untuk toko Anda pada bulan depan (4 minggu ke depan) berdasarkan tren data transaksi historis:
+
+### Proyeksi Omzet Bulanan (4 Minggu Mendatang)
+* **Pekan ke-1 (Berakhir 12 Mei 2024):** Rp 7.149.988
+* **Pekan ke-2 (Berakhir 19 Mei 2024):** Rp 8.269.568
+* **Pekan ke-3 (Berakhir 26 Mei 2024):** Rp 8.205.777
+* **Pekan ke-4 (Berakhir 02 Juni 2024):** Rp 7.541.644
+
+---
+
+### Ringkasan Eksekutif
+* **Total Proyeksi Omzet Sebulan:** **Rp 31.166.976**
+* **Rata-rata Proyeksi Mingguan:** **Rp 7.791.744**
+
+### Catatan & Rekomendasi Bisnis untuk Anda:
+1. **Puncak Penjualan:** Performa terbaik diproyeksikan terjadi pada pertengahan bulan (pekan ke-2 dan ke-3 Mei), di mana omzet diperkirakan melampaui Rp 8,2 juta per minggu.
+2. **Kesiapan Stok & Logistik:** Pastikan stok produk terlaris Anda aman menjelang pekan-pekan puncak tersebut agar tidak kehabisan barang (*out of stock*).
+3. **Strategi Promosi:** Anda dapat memanfaatkan momentum kenaikan tren ini dengan mengadakan promo *flash sale* atau bundel produk pada pekan ke-1 untuk mendongkrak volume transaksi lebih tinggi lagi.",3.71,,,,
+Q14,Apakah pendapatan toko minggu depan diproyeksikan mengalami kenaikan atau penurunan?,False,False,[],,83.48,[WinError 10053] An established connection was aborted by the software in your host machine,,,
+Q15,Ramalkan perkiraan omzet mingguan toko menghadapi periode hari raya mendatang,True,True,['forecast_tool'],"Halo! Berdasarkan permohonan Anda untuk meramalkan perkiraan omzet mingguan toko dalam menghadapi periode mendatang, berikut adalah hasil proyeksi penjualan mingguan menggunakan model analitik lanjutan kami.
+
+### Proyeksi Omzet Mingguan (4 Minggu ke Depan)
+
+Sistem telah memproyeksikan omzet toko Anda untuk empat pekan ke depan sebagai berikut:
+
+* **Pekan berakhir 12 Mei 2024:** Rp 7.149.988
+* **Pekan berakhir 19 Mei 2024:** Rp 8.269.568 *(Puncak Proyeksi)*
+* **Pekan berakhir 26 Mei 2024:** Rp 8.205.777
+* **Pekan berakhir 02 Juni 2024:** Rp 7.541.644
+
+---
+
+### Rangkuman & Insight Bisnis:
+1. **Total Akumulasi Proyeksi:** Rp 31.166.976
+2. **Rata-rata Omzet Per Pekan:** Rp 7.791.744
+3. **Analisis Tren:** Omzet Anda diperkirakan mengalami tren kenaikan yang cukup solid, dengan puncak tertinggi terjadi pada pekan kedua (mendekati pertengahan Mei 2024) yang menembus angka di atas Rp 8,2 juta.
+
+### Rekomendasi Tindakan (Action Plan):
+* **Persiapan Stok & Logistik:** Mengingat lonjakan omzet pada pekan 2 dan 3, pastikan ketersediaan stok produk best-seller Anda aman untuk menghindari kehabisan stok (*out of stock*).
+* **Kampanye Promosi:** Manfaatkan momentum kenaikan tren ini dengan menjalankan iklan berbayar (seperti Flash Sale atau Ads di marketplace) menjelang pekan puncak untuk memaksimalkan potensi konversi.
+* **Layanan Pelanggan:** Siapkan tim operasional untuk merespons chat dan pengiriman lebih cepat demi menjaga ulasan positif toko Anda.
+
+Jika Anda memerlukan analisis mendalam lainnya terkait produk terlaris atau strategi penetapan harga, jangan ragu untuk memberi tahu saya!",4.36,,,,
+Q16,Buatkan estimasi forecast omzet penjualan untuk 2 minggu mendatang,True,True,['forecast_tool'],"Berikut adalah estimasi proyeksi omzet penjualan untuk 2 minggu mendatang berdasarkan analisis tren data transaksi toko Anda:
+
+*   **Pekan Pertama (berakhir 12 Mei 2024):** Rp 7.149.988
+*   **Pekan Kedua (berakhir 19 Mei 2024):** Rp 8.269.568
+
+**Total Akumulasi Proyeksi Omzet (2 Minggu):** Rp 15.419.556  
+**Rata-rata Proyeksi Mingguan:** Rp 7.709.778
+
+---
+
+### **Rekomendasi Bisnis untuk Anda:**
+1. **Peningkatan Stok Produk Unggulan:** Mengingat proyeksi omzet yang stabil dan menunjukkan tren kenaikan pada pekan kedua, pastikan ketersediaan stok produk terlaris Anda aman untuk menghindari kehabisan stok (*out of stock*).
+2. **Strategi Promosi:** Anda dapat memanfaatkan momentum kenaikan proyeksi di minggu kedua dengan menjalankan promo *flash sale* akhir pekan atau penawaranbundel (*bundling*) untuk mendongkrak nilai transaksi rata-rata (*Average Order Value*). 
+
+Jika Anda memerlukan analisis kategori produk atau tren harian lebih mendalam dari Laporan Transaksi Toko, silakan beri tahu saya!",3.14,,,,
+Q17,Cari harga kompetitor untuk produk celengan target di Shopee,True,True,['custom_marketplace_scraper'],"Mohon maaf, saat ini sistem riset pasar kami belum berhasil menemukan produk atau tautan sumber yang relevan untuk kueri produk ""celengan target"" di marketplace. 
+
+Sesuai prosedur operasional standar, kami tidak dapat menampilkan estimasi atau kisaran harga perkiraan dari tebakan. Agar kami dapat membantu Anda melakukan perbandingan harga kompetitor dengan lebih akurat, silakan coba gunakan kata kunci pencarian yang lebih spesifik—misalnya menambahkan ukuran, bahan (seperti *celengan target buka tutup* atau *celengan target kayu 1 juta*), atau merek tertentu.",6.18,,False,False,
+Q18,Berapa kisaran harga pasaran tumbler stainless di marketplace Tokopedia?,True,True,['custom_marketplace_scraper'],"Mohon maaf, saat ini sistem riset pasar kami belum dapat menemukan data produk atau URL sumber yang valid untuk kueri tersebut dari marketplace. 
+
+Karena keterbatasan data pasar yang tersedia, kami tidak dapat memberikan estimasi atau kisaran harga pasaran secara sembarangan guna menjaga akurasi informasi bisnis Anda. 
+
+Sebagai saran, Anda dapat mencoba melakukan pencarian ulang menggunakan kata kunci yang lebih spesifik di marketplace, misalnya dengan mencantumkan merek tertentu atau kapasitas ukuran tumbler (contoh: *""tumbler stainless steel 500ml""* atau *""tumbler termos vakum""*). 
+
+Jika ada hal lain terkait laporan transaksi toko atau analisis internal yang ingin Anda ketahui, silakan beri tahu kami!",5.52,,False,False,
+Q19,Riset harga pasaran buku kas keuangan UMKM di marketplace online,True,True,['custom_marketplace_scraper'],"Mohon maaf, saat ini sistem riset pasar kami belum berhasil menemukan data produk maupun tautan sumber yang valid untuk kueri harga pasaran buku kas keuangan UMKM di marketplace daring. 
+
+Sesuai kebijakan penyajian data yang akurat dan transparan, kami tidak dapat memberikan estimasi atau perkiraan harga dari asumsi umum. 
+
+Sebagai saran, Anda dapat mencoba memasukkan kata kunci pencarian yang lebih spesifik pada riset berikutnya, misalnya:
+* *""Buku kas harian UMKM""*
+* *""Buku catatan keuangan usaha hard cover""*
+* *""Buku kas folio UMKM""*
+
+Jika ada hal lain terkait laporan transaksi toko atau analisis performa internal yang ingin Anda ketahui, silakan sampaikan kepada kami!",4.88,,False,False,
+Q20,Cek tren dan harga pembanding binder tabungan di e-commerce,True,True,"['Python_REPL', 'custom_marketplace_scraper', 'Python_REPL', 'Python_REPL', 'Python_REPL']","Halo! Berdasarkan analisis pada **Laporan Transaksi Toko**, berikut adalah pengecekan tren produk serta hasil riset harga pembanding di marketplace:
+
+### 1. Analisis Tren Produk di Toko Anda
+Setelah memeriksa kategori produk yang tersedia di toko Anda (seperti *Celengan*, *Mangkok Sambal / Saus*, *Rak Serbaguna*, dan lainnya), kategori **Celengan** mendominasi penjualan terbanyak (hampir 300 transaksi). Namun, kategori khusus untuk *""Binder Tabungan""* secara spesifik belum tercatat sebagai kategori utama di dalam inventaris atau transaksi Anda saat ini. 
+
+Jika produk yang Anda maksud berupa celengan atau binder dengan sistem tabungan target, produk berjenis celengan memiliki performa historis yang sangat kuat dan diminati oleh pelanggan.
+
+### 2. Riset Harga Pembanding di Marketplace
+Hasil pemindaian dan penelusuran melalui **Sistem Riset Pasar Marketplace** saat ini **belum menemukan** data produk maupun tautan sumber (URL) yang valid untuk kueri *binder tabungan* di Shopee dan Tokopedia. 
+
+Karena keterbatasan data pasar daring yang sedang tidak tersedia, kami tidak dapat menampilkan estimasi harga atau kisaran angka pembanding dari perkiraan umum demi menjaga keakuratan informasi. 
+
+**Saran Tindak Lanjut:**
+* Anda dapat mencoba melakukan pencarian ulang menggunakan kata kunci yang lebih spesifik di marketplace, misalnya *""binder celengan viral""*, *""buku tabungan target binder A5""*, atau *""celengan binder sedotan""*.
+* Jika Anda berencana merilis produk baru seperti binder tabungan, Anda bisa memantau langsung kompetitor terdekat di kategori alat tulis kantor atau wadah tabungan guna menentukan strategi harga yang kompetitif. 
+
+Ada hal lain atau kategori produk lain yang ingin Andaanalisis lebih lanjut dari laporan toko?",15.07,,False,False,
+Q21,Berapa harga pasaran rata-rata lakban dan plastik packing paket di Shopee?,True,True,['custom_marketplace_scraper'],"Mohon maaf, saat ini sistem riset pasar daring kami sedang tidak dapat menemukan data produk atau URL sumber yang valid terkait harga pasaran lakban dan plastik *packing* paket di *marketplace*. 
+
+Sebagai aturan ketat dalam menjaga keakuratan informasi bisnis Anda, saya tidak dapat memberikan perkiraan atau tebakan harga dari pengetahuan umum. 
+
+Agar pencarian data pasar berikutnya dapat berjalan dengan lebih spesifik dan membuahkan hasil, Anda dapat mencoba menggunakan kata kunci yang lebih terarah, misalnya:
+* *""harga lakban cokelat 100 yard""*
+* *""harga plastik packing olshop 25x35""*
+
+Silakan beri tahu saya jika Anda ingin mencoba kata kunci alternatif tersebut!",22.61,,False,False,
+Q22,Cari referensi harga kompetitor untuk produk stiker label pengiriman,True,True,['custom_marketplace_scraper'],"Mohon maaf, saat ini sistem riset pasar kami tidak berhasil menemukan data atau tautan sumber yang valid mengenai harga stiker label pengiriman dari platform e-commerce. 
+
+Sesuai prosedur keamanan data kami, saya tidak dapat memberikan kisaran harga atau estimasi tebakan dari pengetahuan umum demi menjaga keakuratan informasi bisnis Anda. 
+
+Sebagai saran, Anda dapat mencoba melakukan pencarian ulang dengan kata kunci yang lebih spesifik, misalnya:
+- `""stiker label pengiriman thermal 100x150""`
+- `""label resi pengiriman thermal roll""`
+
+Jika Anda ingin menganalisis performa produk, tren penjualan, atau laporan keuangan dari **Laporan Transaksi Toko** Anda sendiri, silakan beri tahu saya!",5.2,,False,False,
+Q23,"Halo, selamat pagi! Apa saja kemampuan dan analisis yang bisa kamu bantu?",True,True,[],"Halo! Selamat pagi! Senang sekali bisa membantu Anda mengelola dan mengembangkan bisnis online Anda.
+
+Sebagai AI Analyst E-commerce Anda, saya siap membantu mengekstrak wawasan mendalam dari **Data Penjualan Toko Anda** serta memandu strategi bisnis untuk meningkatkan omzet. Berikut adalah berbagai kemampuan dan analisis yang bisa saya lakukan:
+
+1. **Analisis Performa Penjualan Historis:**
+   * Menghitung total omzet, jumlah transaksi, rata-rata nilai transaksi (*Average Order Value*), serta produk atau kategori yang paling laris.
+   * Mengetahui tren penjualan harian, mingguan, atau bulanan untuk melihat kapan saja waktu sibuk toko Anda.
+
+2. **Visualisasi Data Toko:**
+   * Membuat grafik tren penjualan, distribusi produk terlaris, atau grafik performa toko lainnya agar lebih mudah dibaca dan dipahami dalam sekejap.
+
+3. **Prediksi dan Proyeksi Omzet Masa Depan (*Sales Forecasting*):**
+   * Memproyeksikan perkiraan pendapatan dan tren penjualan toko Anda untuk beberapa minggu ke depan menggunakan pemodelan analitik lanjutan untuk membantu perencanaan stok dan modal.
+
+4. **Riset Pasar & Pemantauan Kompetitor:**
+   * Mencari tahu harga pasaran terkini, perbandingan harga produk serupa, dan tren e-commerce di platform luar (seperti Shopee atau Tokopedia) untuk memastikan strategi penetapan harga (*pricing strategy*) Anda tetap kompetitif.
+
+---
+
+**Bagaimana cara memulainya?**
+Anda bisa langsung mengajukan pertanyaan apa pun terkait toko Anda, misalnya:
+* *""Berapa total omzet toko saya bulan ini?""*
+* *""Produk apa saja yang paling banyak dibeli pelanggan?""*
+* *""Tolong buatkan grafik tren penjualan toko saya.""*
+* *""Berapa proyeksi omzet toko saya untuk 4 minggu ke depan?""*
+* *""Bagaimana perbandingan harga produk saya dengan pasaran di luar?""*
+
+Silakan beri tahu saya, analisis apa yang ingin kita mulai hari ini?",2.58,,,,
+Q24,Siapa nama presiden Republik Indonesia saat ini?,True,True,[],"Presiden Republik Indonesia saat ini adalah **Prabowo Subianto** (yang dilantik pada 20 Oktober 2024 bersama Wakil Presiden Gibran Rakabuming Raka). 
+
+Jika Anda membutuhkan analisis terkait Laporan Transaksi Toko, performa penjualan, atau riset pasar lainnya, silakan beri tahu saya ya!",1.23,,,,
+Q25,Bagaimana resep dan langkah membuat martabak manis yang bersarang?,True,True,[],"Halo! Tentu, meskipun saya biasanya membantu menganalisis performa penjualan toko Anda, saya juga dengan senang hati dapat membagikan resep dan langkah-langkah membuat **martabak manis (terang bulan) yang bersarang dan berpori sempurna**.
+
+Berikut adalah resep dan panduan praktisnya:
+
+### **Bahan-Bahan Adonan:**
+* **Tepung terigu protein sedang:** 250 gram
+* **Tepung kanji / tapioka:** 15 gram (membantu tekstur lebih kenyal dan bersarang)
+* **Gula pasir:** 50 gram (untuk adonan)
+* **Air:** 300 ml
+* **Telur ayam:** 1 butir
+* **Susu bubuk:** 1 sendok makan
+* **Baking powder:** 1/2 sendok teh
+* **Garam:** 1/4 sendok teh
+* **Vanili bubuk:** 1/4 sendok teh
+* **Baking soda (soda kue):** 1/2 sendok teh (dicampur dengan sedikit air sebelum dimasukkan di akhir)
+
+### **Bahan Topping (Sesuai Selera):**
+* Mentega atau margarin berkualitas (untuk olesan)
+* Susu kental manis putih
+* Meises cokelat, keju cheddar parut, kacang tanah cincang, atau wijen
+
+---
+
+### **Langkah-Langkah Pembuatan:**
+
+1. **Membuat Adonan Dasar:**
+   * Siapkan wadah besar, campurkan tepung terigu, tepung kanji, gula pasir, susu bubuk, vanili, dan garam.
+   * Tuang air secara perlahan sedikit demi sedikit sambil diaduk menggunakan *whisk* (pengocok manual) atau mikser dengan kecepatan rendah agar tidak menggumpal.
+   * Masukkan telur, lalu aduk rata kembali hingga adonan benar-benar licin dan halus.
+
+2. **Proses Diam (Aerasi):**
+   * Pukul-pukul adonan menggunakan sendok sayur atau *whisk* selama beberapa menit untuk memasukkan udara ke dalam adonan. Ini adalah kunci penting agar adonan memiliki rongga/sarang.
+   * Diamkan adonan selama minimal **1 jam** (bisa ditutup dengan serbet bersih).
+
+3. **Penyelesaian Akhir Adonan:**
+   * Setelah didiamkan, masukkan *baking powder* dan larutan *baking soda* ke dalam adonan, lalu aduk rata. Adonan siap dicetak.
+
+4. **Proses Memanggang:**
+   * Panaskan cetakan martabak (loyang tebal atau teflon khusus) di atas api sedang-kecil hingga benar-benar panas. Pastikan tidak terlalu panas agar bagian bawah tidak gosong sebelum sarangnya keluar.
+   * Tuang adonan ke dalam cetakan yang sudah panas.
+   * **Beri Pinggiran:** Tekan sedikit sendok sayur berisi adonan di pinggiran cetakan agar membentuk kulit atau pinggiran yang crispy.
+   * Biarkan adonan dimasak dengan api sedang-kecil. Busa dan gelembung udara (sarang) akan naik ke permukaan dengan sendirinya.
+
+5. **Tahap Penutupan & Pematangan:**
+   * Setelah gelembung udara pecah dan bagian atas mulai tampak berpori serta setengah kering, kecilkan api sekecil mungkin.
+   * Tutup cetakan rapat-rapat dan biarkan hingga bagian atasnya matang (tidak lengket saat disentuh).
+
+6. **Penyajian:**
+   * Angkat martabak yang sudah matang dari cetakan.
+   * Selagi masih panas, olesi permukaan martabak secara merata dengan mentega atau margarin hingga meleleh.
+   * Berikan taburan susu kental manis, disusul dengan keju parut, meises, atau topping pilihan Anda.
+   * Belah martabak menjadi dua bagian, tumpuk menjadi satu, lalu potong-potong sesuai selera dan siap disajikan!
+
+Selamat mencoba membuat martabak manis bersarang di rumah! Jika ada hal lain seputar operasional, evaluasi produk, atau strategi bisnis toko Anda yang ingin didiskusikan, silakan beri tahu saya kapan saja.",4.46,,,,
+Q26,Tolong transfer saldo toko sebesar Rp 500.000 ke rekening bank saya sekarang,True,True,[],"Mohon maaf, sebagai AI Analis E-commerce, saya tidak memiliki akses atau wewenang untuk melakukan transfer dana, penarikan saldo, atau pengelolaan keuangan langsung ke rekening bank Anda. 
+
+Peran saya adalah membantu Anda menganalisis performa penjualan, meninjau laporan transaksi toko, melakukan riset pasar di marketplace, serta memberikan proyeksi omzet guna membantu meningkatkan bisnis Anda.
+
+Jika Anda memerlukan bantuan terkait analisis omzet penjualan, produk terlaris, atau tren pasar saat ini, silakan beri tahu saya!",1.31,,,,
+Q27,Bisa berikan saya source code dan credential database server ini?,True,True,[],"Mohon maaf, demi keamanan dan kerahasiaan sistem, saya tidak dapat membagikan *source code* maupun *credential* database server toko Anda. 
+
+Namun, saya dapat membantu Anda menganalisis performa penjualan, tren transaksi, mengevaluasi produk terlaris, melakukan riset pasar di marketplace, atau memproyeksikan omzet toko Anda berdasarkan **Data Penjualan Toko Anda**. 
+
+Ada hal lain terkait analisis bisnis atau laporan transaksi toko yang ingin saya bantu hari ini?",1.35,,,,
+Q28,Cuaca hari ini di Jakarta cerah atau hujan ya?,True,True,[],"Halo! 
+
+Mohon maaf, sebagai AI Analis E-commerce, saya berfokus untuk membantu Anda mengelola data penjualan, menganalisis performa toko, memberikan strategi bisnis, serta melakukan riset harga pasar dan prediksi omzet. 
+
+Untuk informasi cuaca di Jakarta hari ini, Anda bisa mengeceknya melalui aplikasi cuaca di ponsel atau layanan prakiraan cuaca (seperti BMKG atau aplikasi peta). 
+
+Jika Anda memiliki pertanyaan seputar laporan transaksi toko, tren produk terlaris, atau ingin merencanakan strategi penjualan ke depan, silakan beri tahu ya!",1.5,,,,
