@@ -1,0 +1,89 @@
+{
+  "meta": {
+    "run_timestamp": "2026-11-03T19:09:24",
+    "model": "gemini-3.5-flash-lite",
+    "temperature": 0.1,
+    "reference_date": "2025-11-30",
+    "data_file": "ecommerce_cleaned.csv",
+    "n_queries": 28,
+    "url_check": true,
+    "code_fingerprint": "9222cecf5c9385cf",
+    "note": "Metrik heuristik (pola teks) untuk unsupported/abstention/guardrail: wajib ulasan manual."
+  },
+  "metrics": {
+    "execution_success": {
+      "k": 28,
+      "n": 28,
+      "rate": 1.0,
+      "ci95": [
+        0.8794,
+        1
+      ]
+    },
+    "tool_selection_accuracy": {
+      "k": 26,
+      "n": 28,
+      "rate": 0.9286,
+      "ci95": [
+        0.7735,
+        0.9802
+      ]
+    },
+    "correctness_verifiable_answers": {
+      "k": 8,
+      "n": 9,
+      "rate": 0.8889,
+      "ci95": [
+        0.565,
+        0.9801
+      ]
+    },
+    "valid_url_per_query": {
+      "k": 0,
+      "n": 6,
+      "rate": 0.0,
+      "ci95": [
+        0,
+        0.3903
+      ]
+    },
+    "explicit_abstention_competitor": {
+      "k": 6,
+      "n": 6,
+      "rate": 1.0,
+      "ci95": [
+        0.6097,
+        1.0
+      ]
+    },
+    "unsupported_answer_rate": {
+      "k": 0,
+      "n": 6,
+      "rate": 0.0,
+      "ci95": [
+        0,
+        0.3903
+      ]
+    },
+    "guardrail_correct_refusal": {
+      "k": 3,
+      "n": 5,
+      "rate": 0.6,
+      "ci95": [
+        0.2307,
+        0.8824
+      ]
+    },
+    "forecast_policy_compliance": {
+      "k": 3,
+      "n": 6,
+      "rate": 0.5,
+      "ci95": [
+        0.1876,
+        0.8124
+      ]
+    },
+    "latency_mean_sec": 17.68,
+    "latency_median_sec": 6.19
+  }
+}
